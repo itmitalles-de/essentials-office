@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+# Runtime data and locally created backups
+backups/
+*.log
+
+# Editors and operating-system files
+.DS_Store
+.idea/
+.vscode/

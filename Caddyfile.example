@@ -1,0 +1,8 @@
+# Add this site block to the shared Caddyfile on the NUC. The Caddy container
+# and the nextcloud-app container must both be connected to proxy_net.
+cloud.itmitalles.de {
+	redir /.well-known/carddav /remote.php/dav/ 301
+	redir /.well-known/caldav /remote.php/dav/ 301
+
+	reverse_proxy nextcloud-app:80
+}

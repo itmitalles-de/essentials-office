@@ -1,0 +1,136 @@
+name: nextcloud
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: nextcloud-db
+    restart: unless-stopped
+    stop_grace_period: 1m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_INITDB_ARGS: --data-checksums
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - /srv/nextcloud/postgres:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      TZ: ${TZ:-Europe/Berlin}
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - /srv/nextcloud/redis:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -qx PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    image: nextcloud:34-apache
+    container_name: nextcloud-app
+    restart: unless-stopped
+    stop_grace_period: 1m
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      REDIS_HOST: redis
+      REDIS_HOST_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER:?NEXTCLOUD_ADMIN_USER must be set}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD:?NEXTCLOUD_ADMIN_PASSWORD must be set}
+      NEXTCLOUD_DATA_DIR: /var/www/html/data
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:?NEXTCLOUD_TRUSTED_DOMAINS must be set}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:?TRUSTED_PROXIES must be set}
+      OVERWRITEPROTOCOL: ${OVERWRITEPROTOCOL:-https}
+      OVERWRITECLIURL: ${OVERWRITECLIURL:-https://cloud.itmitalles.de}
+      APACHE_DISABLE_REWRITE_IP: "1"
+      NEXTCLOUD_INIT_HTACCESS: "true"
+      PHP_MEMORY_LIMIT: 1G
+      PHP_UPLOAD_LIMIT: 10G
+      APACHE_BODY_LIMIT: "10737418240"
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - /srv/nextcloud/html:/var/www/html
+      - /srv/nextcloud/data:/var/www/html/data
+    networks:
+      backend:
+      egress:
+      proxy_net:
+        aliases:
+          - nextcloud-app
+    healthcheck:
+      test: ["CMD-SHELL", "php -r '$$status = @file_get_contents(\"http://127.0.0.1/status.php\"); exit($$status === false ? 1 : 0);'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 2m
+
+  cron:
+    image: nextcloud:34-apache
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    stop_grace_period: 1m
+    depends_on:
+      app:
+        condition: service_started
+    entrypoint: /cron.sh
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      REDIS_HOST: redis
+      REDIS_HOST_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      NEXTCLOUD_DATA_DIR: /var/www/html/data
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:?NEXTCLOUD_TRUSTED_DOMAINS must be set}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:?TRUSTED_PROXIES must be set}
+      OVERWRITEPROTOCOL: ${OVERWRITEPROTOCOL:-https}
+      OVERWRITECLIURL: ${OVERWRITECLIURL:-https://cloud.itmitalles.de}
+      APACHE_DISABLE_REWRITE_IP: "1"
+      NEXTCLOUD_INIT_HTACCESS: "true"
+      PHP_MEMORY_LIMIT: 1G
+      PHP_UPLOAD_LIMIT: 10G
+      APACHE_BODY_LIMIT: "10737418240"
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - /srv/nextcloud/html:/var/www/html
+      - /srv/nextcloud/data:/var/www/html/data
+    networks:
+      backend:
+      egress:
+
+networks:
+  proxy_net:
+    external: true
+    name: ${PROXY_NETWORK:-proxy_net}
+  backend:
+    internal: true
+  egress:
+    driver: bridge
