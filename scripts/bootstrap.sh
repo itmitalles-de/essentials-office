@@ -35,7 +35,8 @@ prepare_directory() {
   local path=$1 mode=$2 owner=$3 group=$4
 
   if [ ! -e "$path" ]; then
-    sudo install -d -m "$mode" -o "$owner" -g "$group" "$path"
+    sudo install -d -m "$mode" "$path"
+    sudo chown "$owner:$group" "$path"
     return
   fi
 
