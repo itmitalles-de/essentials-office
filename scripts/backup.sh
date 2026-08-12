@@ -58,7 +58,7 @@ chmod 0700 "$WORK_DIR"
 docker compose exec -T -u www-data app php occ status --output=json >/dev/null
 docker compose exec -T -u www-data app php occ maintenance:mode --on >/dev/null
 MAINTENANCE_ENABLED=true
-docker compose stop cron >/dev/null
+docker compose stop --timeout 10 cron >/dev/null
 CRON_STOPPED=true
 
 docker compose exec -T db sh -ec 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' >"$WORK_DIR/nextcloud.pg.dump"
