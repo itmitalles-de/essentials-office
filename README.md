@@ -7,6 +7,27 @@ The repository deliberately contains no secrets and no user data. It deploys
 Nextcloud 34 (Apache), PostgreSQL 17, Redis 7, and a dedicated Nextcloud cron
 container. Caddy remains a shared, independent reverse-proxy stack on the NUC.
 
+## Current deployment status
+
+Status verified on 2026-08-12:
+
+- The repository is checked out on the NUC at `/opt/nextcloud`; persistent data
+  is stored below `/srv/nextcloud`.
+- Nextcloud 34.0.2 is installed and outside maintenance mode. The application,
+  PostgreSQL, Redis, and cron containers are running; the database and
+  application health checks pass.
+- Cron execution, local backup creation, and application-container restart
+  persistence have been tested. PostgreSQL and Redis publish no host ports.
+- The Namecheap DDNS script and systemd units are installed on the NUC, but the
+  timer remains disabled until the per-domain DDNS password is entered locally
+  and the `cloud` A + Dynamic DNS record exists at Namecheap.
+- `https://cloud.itmitalles.de` is **not publicly live**. Public DNS has no
+  `cloud` A/AAAA record, router reachability is not yet verified from a truly
+  external network, and the shared Caddy configuration must be reconciled
+  before its existing configuration is reloaded.
+- Local backups exist on the same NVMe. A tested restore plus encrypted offsite
+  backup remain mandatory before production data is migrated.
+
 ## Architecture
 
 ```text
