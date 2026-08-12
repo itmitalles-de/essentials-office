@@ -1,0 +1,34 @@
+[Unit]
+Description=Update cloud.itmitalles.de through Namecheap Dynamic DNS
+Documentation=https://www.namecheap.com/support/knowledgebase/article.aspx/29/11/how-to-dynamically-update-the-hosts-ip-with-an-https-request/
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/namecheap-ddns.env
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/namecheap-ddns.env
+ExecStart=/usr/local/sbin/namecheap-ddns
+DynamicUser=yes
+UMask=0077
+
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=strict
+RemoveIPC=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

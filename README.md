@@ -10,9 +10,9 @@ container. Caddy remains a shared, independent reverse-proxy stack on the NUC.
 ## Architecture
 
 ```text
-Internet over IPv6
+Internet over IPv4 and/or IPv6
         |
-  cloud.itmitalles.de (DNS-only AAAA)
+  cloud.itmitalles.de (DNS-only A/AAAA)
         |
   Caddy :443 on proxy_net
         |
@@ -47,8 +47,9 @@ All persistent service state is below `/srv/nextcloud`:
 - A shared external Docker network named `proxy_net`, or no network with that
   name. `bootstrap.sh` creates it only when absent.
 - Shared Caddy connected to that network and owning host ports 80 and 443.
-- DNS administration for `itmitalles.de` and a publicly reachable IPv6 path to
-  Caddy on TCP 80 and 443. PostgreSQL and Redis require no public firewall rule.
+- DNS administration for `itmitalles.de` and a publicly reachable IPv4 or IPv6
+  path to Caddy on TCP 80 and 443. PostgreSQL and Redis require no public
+  firewall rule.
 - Passwordless `sudo` for the deployment account, only to create and secure
   `/srv/nextcloud` and local backup files.
 
@@ -85,7 +86,7 @@ The initial administrator account and its generated password are in the
 NUC-local `/opt/nextcloud/.env` (mode `0600`), never in Git. Store an encrypted
 copy in secret management before relying on the instance.
 
-## DNS and IPv6
+## DNS and public reachability
 
 Do not assume a public IPv4 address: DS-Lite and CGNAT are common. Prefer a
 DNS-only `AAAA` record for `cloud` pointing to the NUC/reverse proxy's public,
@@ -103,6 +104,47 @@ Mode: DNS only
 The router must allow inbound IPv6 TCP 80 and 443 to the NUC. The host firewall
 must allow those ports as well. Verify from an external IPv6-capable network
 before relying on ACME. Caddy then obtains and renews the certificate itself.
+
+### Namecheap Dynamic DNS on the NUC
+
+The domain currently uses Namecheap authoritative DNS. Namecheap's native
+Dynamic DNS endpoint updates only an IPv4 `A` record; it cannot update `AAAA`
+records. This is useful only when the router itself has a publicly routable
+IPv4 address and forwards TCP 80 and 443 to the NUC. An address returned by a
+public “what is my IP” service does not prove that condition: a CGNAT gateway
+returns an address as well but does not accept inbound forwarding.
+
+In Namecheap, open **Domain List → Manage → Advanced DNS**, enable **Dynamic
+DNS**, and create an **A + Dynamic DNS Record** with host `cloud`. Do not paste
+the Dynamic DNS password into Git, chat, shell history, or an issue. On the NUC,
+run the interactive installer from the repository checkout:
+
+```bash
+cd /opt/nextcloud
+sudo ./scripts/install-namecheap-ddns.sh
+```
+
+The prompt does not echo the password. The installer writes it only to
+`/etc/namecheap-ddns.env` as `root:root` with mode `0600`, performs a first
+update, and enables a hardened systemd timer that refreshes the record every
+five minutes. The updater supplies its HTTPS request through curl's standard
+input so the password is absent from process arguments and journal messages.
+
+Inspect the service without exposing its environment:
+
+```bash
+systemctl status --no-pager namecheap-ddns.timer
+systemctl list-timers --all namecheap-ddns.timer
+journalctl -u namecheap-ddns.service --since today --no-pager
+```
+
+If the Netgear WAN IPv4 is not the same address family/path shown by the NUC,
+or the router offers no IPv4 port forwarding, do not enable this `A` record as
+the public Nextcloud path. Namecheap cannot keep a changing IPv6 prefix updated
+with its native DDNS feature. The clean alternative is to move authoritative
+DNS to a provider with a scoped API token and dynamic `AAAA` support while
+leaving the domain registration at Namecheap; any such migration must preserve
+the complete existing zone and keep the cloud record DNS-only.
 
 If the DNS provider is Cloudflare in a future migration, keep this record
 **DNS-only** unless its upload-size limits are explicitly acceptable for the
@@ -223,6 +265,9 @@ Before production use, also verify:
 
 - Credentials are generated with `openssl rand` and stored only in NUC-local
   `.env` with mode `0600`.
+- The Namecheap per-domain DDNS password is stored only in
+  `/etc/namecheap-ddns.env` with mode `0600`; it is never passed as a process
+  argument or written to the journal.
 - PostgreSQL and Redis are internal-only Docker services; Redis also requires a
   password.
 - Nextcloud trusts only the live `proxy_net` CIDR, not all RFC1918 networks.
@@ -251,7 +296,11 @@ Before production use, also verify:
 
 ## Open operational items
 
-- Configure the DNS-only public AAAA record and IPv6 router/firewall path.
+- Enable Namecheap Dynamic DNS and create the `cloud` A + Dynamic DNS record,
+  then enter its per-domain password locally on the NUC.
+- Verify from a genuinely external network whether the Netgear router has a
+  forwardable public IPv4 and whether TCP 80/443 reach Caddy. If it does not,
+  choose a DNS provider with dynamic `AAAA` support and verify the IPv6 path.
 - Reconcile any existing Caddy configuration drift before reloading it.
 - Put encrypted backups and the generated `.env` into independently stored,
   offsite backup/secret management, then test a restore.
