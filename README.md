@@ -1,7 +1,25 @@
-# cloud.itmitalles.de
+# Workspace Suite
 
-Reproducible Docker Compose deployment for a production Nextcloud instance at
-`https://cloud.itmitalles.de`.
+Open-source collaboration platform and self-hosted alternative to Microsoft 365 / Google Workspace. The existing production-grade Nextcloud foundation is deployed at `https://cloud.itmitalles.de`; the repository grows around that foundation without replacing it.
+
+
+
+> **Main product 3 of 3.** The product name is **Workspace Suite**. The public Nextcloud hostname remains `cloud.itmitalles.de`; the repository should later be renamed administratively to `itmitalles-de/workspace-suite`.
+
+## Product scope
+
+Workspace Suite is composed of independently operable modules:
+
+- Nextcloud Files, sharing, versions and sync
+- Calendar, Contacts and Tasks as the canonical groupware data store
+- Nextcloud Talk; TURN and the high-performance backend are separate production stages
+- Nextcloud Office with a dedicated Collabora Online container for browser-based documents, spreadsheets and presentations
+- Nextcloud Mail connected to mailcow over IMAP/SMTP
+- Notes for personal notes, Collectives for shared knowledge, Deck for Kanban, plus Tables and Forms
+- mailcow as an independently managed mail subsystem; SOGo is an optional fallback webmail, not a second canonical calendar/contact system
+- centralized OIDC/SSO only after the core modules are stable
+
+The current NUC deployment contains only the validated Nextcloud core. Collabora, Talk infrastructure and mailcow are target modules, not yet implemented here. mailcow must not be pasted into the Nextcloud Compose file: it has its own lifecycle, ports, DNS, backups and substantial memory requirements. A production mail system should use infrastructure with a static address and controllable PTR/rDNS rather than relying on a residential dynamic connection.
 
 The repository deliberately contains no secrets and no user data. It deploys
 Nextcloud 34 (Apache), PostgreSQL 17, Redis 7, and a dedicated Nextcloud cron
