@@ -89,7 +89,7 @@ docker compose exec -T redis sh -ec 'redis-cli --no-auth-warning -a "$REDIS_PASS
 occ_status=$(docker compose exec -T -u www-data app php occ status --output=json)
 printf '%s\n' "$occ_status" | grep -Eq '"installed"[[:space:]]*:[[:space:]]*true' || die 'Nextcloud is not installed'
 printf '%s\n' "$occ_status" | grep -Eq '"maintenance"[[:space:]]*:[[:space:]]*false' || die 'Nextcloud is in maintenance mode'
-docker compose exec -T -u www-data app php occ background:status | grep -qi cron || die 'Nextcloud background mode is not cron'
+docker compose exec -T -u www-data app php occ config:app:get core backgroundjobs_mode | grep -Fxq cron || die 'Nextcloud background mode is not cron'
 
 local_status=$(curl --fail --silent --show-error --insecure --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/status.php") || die 'Caddy does not reach Nextcloud status.php'
 printf '%s\n' "$local_status" | grep -Eq '"installed"[[:space:]]*:[[:space:]]*true' || die 'Caddy status response is not installed'

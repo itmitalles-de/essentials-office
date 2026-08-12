@@ -211,7 +211,8 @@ Before production use, also verify:
 - `bash -n scripts/*.sh` passes.
 - `docker compose ps` shows no restart loop and PostgreSQL is healthy.
 - The Caddy login page is reachable at the public URL with a valid certificate.
-- Cron executes jobs; inspect `occ background:status` after several minutes.
+- Cron executes jobs; verify `occ config:app:get core backgroundjobs_mode` and
+  inspect scheduled-job history after several minutes.
 - Data still exists after a deliberate `docker compose restart app` during a
   maintenance window, followed by the full health check.
 - `docker ps` and `ss -ltnp` show no public PostgreSQL or Redis port.
