@@ -61,7 +61,8 @@ jobs:
       - name: Test Vaultwarden Web Vault and recovery
         env:
           CHROMIUM_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
-        run: sudo --preserve-env=PATH,CHROMIUM_BIN ./tests/vaultwarden-backup-restore.sh
+          CHROMEDRIVER_BIN: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: sudo --preserve-env=CHROMIUM_BIN,CHROMEDRIVER_BIN ./tests/vaultwarden-backup-restore.sh
       - name: Test isolated Collabora health
         run: ./tests/collabora-health.sh
       - name: Test Talk TURN and credential rotation
@@ -86,7 +87,8 @@ jobs:
       - name: Test clean deployment, modules, browser, and recovery
         env:
           CHROMIUM_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
-        run: sudo --preserve-env=CHROMIUM_BIN,GITHUB_ACTIONS,GITHUB_WORKSPACE ./tests/deploy/run.sh --browser --recovery --hr --intranet --talk
+          CHROMEDRIVER_BIN: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: sudo --preserve-env=CHROMIUM_BIN,CHROMEDRIVER_BIN,GITHUB_ACTIONS,GITHUB_WORKSPACE ./tests/deploy/run.sh --browser --recovery --hr --intranet --talk
 
   # Real DNS, Caddy, Internet ingress, NUC resources, TLS, offsite storage,
   # mail delivery, NAT media quality, and production use remain explicit external

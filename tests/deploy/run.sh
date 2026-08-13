@@ -83,9 +83,12 @@ for command in awk chmod cmp cp curl docker find jq mktemp openssl rg rsync sed 
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
 done
 if [ "$WITH_BROWSER" = true ]; then
-  for command in chromedriver python3; do
-    command -v "$command" >/dev/null 2>&1 || die "browser test requires: $command"
-  done
+  command -v python3 >/dev/null 2>&1 || die 'browser test requires: python3'
+  if [ -n "${CHROMEDRIVER_BIN:-}" ]; then
+    [ -x "$CHROMEDRIVER_BIN" ] || die 'CHROMEDRIVER_BIN is not executable'
+  else
+    command -v chromedriver >/dev/null 2>&1 || die 'browser test requires: chromedriver'
+  fi
 fi
 if [ "$WITH_RECOVERY" = true ]; then
   command -v restic >/dev/null 2>&1 || die 'recovery test requires restic'
@@ -192,7 +195,7 @@ webdav_verify_and_remove() {
 }
 
 run_browser_e2e() {
-  local browser_user browser_password port_mapping browser_port browser_base chromium_bin browser_secret_file
+  local browser_user browser_password port_mapping browser_port browser_base chromium_bin chromedriver_bin browser_secret_file
   browser_user=ordinary-demo
   browser_password=$(openssl rand -hex 32)
   browser_secret_file="$WORK_DIR/.browser-test.env"
@@ -219,7 +222,11 @@ run_browser_e2e() {
     chromium_bin=$(command -v chrome || command -v google-chrome || command -v chromium || command -v chromium-browser || true)
   fi
   [ -n "$chromium_bin" ] || die 'Chromium executable is missing'
-  chromedriver --port=9515 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
+  chromedriver_bin=${CHROMEDRIVER_BIN:-}
+  if [ -z "$chromedriver_bin" ]; then
+    chromedriver_bin=$(command -v chromedriver)
+  fi
+  "$chromedriver_bin" --port=9515 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
   CHROMEDRIVER_PID=$!
   sleep 1
   BROWSER_BASE_URL="$browser_base" \

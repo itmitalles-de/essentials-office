@@ -48,9 +48,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-for command in chmod chromedriver cmp curl docker find grep install jq openssl python3 restic sed touch tr; do
+for command in chmod cmp curl docker find grep install jq openssl python3 restic sed touch tr; do
   command -v "$command" >/dev/null 2>&1 || die "$command is required"
 done
+chromedriver_bin=${CHROMEDRIVER_BIN:-}
+if [ -n "$chromedriver_bin" ]; then
+  [ -x "$chromedriver_bin" ] || die 'CHROMEDRIVER_BIN is not executable'
+else
+  chromedriver_bin=$(command -v chromedriver || true)
+  [ -n "$chromedriver_bin" ] || die 'chromedriver is required'
+fi
 docker info >/dev/null 2>&1 || die 'Docker daemon is not available'
 if docker ps --format '{{.Names}}' | grep -Fxq essentialsplus-office-vaultwarden; then
   die 'the default Vaultwarden container already exists; refusing to interfere with an existing module'
@@ -110,7 +117,7 @@ umask 077
   printf 'MEMBER_EMAIL=member-%s@example.com\n' "$RANDOM"
   printf 'MEMBER_PASSWORD=%s\n' "$(openssl rand -base64 36 | tr -d '\n')"
 } >"$browser_secrets"
-chromedriver --port=9516 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
+"$chromedriver_bin" --port=9516 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
 CHROMEDRIVER_PID=$!
 sleep 1
 chromium_bin=${CHROMIUM_BIN:-}
