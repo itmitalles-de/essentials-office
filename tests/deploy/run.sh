@@ -196,6 +196,8 @@ webdav_verify_and_remove() {
 
 run_browser_e2e() {
   local browser_user browser_password port_mapping browser_port browser_base chromium_bin chromedriver_bin browser_secret_file
+  local module doctor_state
+  local -a browser_modules
   browser_user=ordinary-demo
   browser_password=$(openssl rand -hex 32)
   browser_secret_file="$WORK_DIR/.browser-test.env"
@@ -209,6 +211,14 @@ run_browser_e2e() {
   occ group:add employee >/dev/null 2>&1 || true
   occ group:adduser employee "$browser_user" >/dev/null
   unset browser_password
+
+  IFS=',' read -r -a browser_modules <<<"$BROWSER_EXPECTED_MODULES"
+  for module in "${browser_modules[@]}"; do
+    doctor_state=$(occ essentialsplus:module:doctor "$module") ||
+      die "browser prerequisite healthcheck failed for $module"
+    jq -e '.state == "enabled" and .active == true and .health.fresh == true' <<<"$doctor_state" >/dev/null ||
+      die "browser prerequisite is not healthy and active: $module"
+  done
 
   port_mapping=$(compose port app 80)
   [[ "$port_mapping" =~ ^127\.0\.0\.1:[0-9]+$ ]] || die "browser test port is not loopback-only: $port_mapping"
