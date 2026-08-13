@@ -20,10 +20,12 @@ repository are dated evidence only, not a current live verification.
   `bb3d79e`, `b888dcb`, and `b105280`.
 - Draft PR #1 had no review threads. Its static CI failure was independently
   traced to ShellCheck SC2015; its history gitleaks job passed at that time.
-- The consolidated branch was pushed through `2bea9e7`; draft PR #2
+- The consolidated runtime code is pushed through `520c239`; this handoff-only
+  update follows it. Draft PR #2
   (`Build Essentials+ Office modular control plane`) supersedes PR #1. PR #1
-  remains open and unchanged; neither PR was merged. The separate pause-handoff
-  commit created after that code push is intentionally local until work resumes.
+  remains open and unchanged. At the time of this dated handoff update, PR #2
+  was mergeable and its exact-head CI was green; inspect GitHub for live merge
+  state instead of inferring it from this file.
 
 ## Implemented on this branch
 
@@ -59,13 +61,14 @@ repository are dated evidence only, not a current live verification.
 
 ## Verification evidence (2026-08-13, disposable only)
 
-- The final paused-tree `scripts/validate-static.sh` and `git diff --check`
-  passed after all edits in this stage:
-  all base/profile/overlay Compose renders, Bash syntax, ShellCheck,
+- The exact `520c239` tree passed `scripts/validate-static.sh` and
+  `git diff --check`. This covered all base/profile/overlay Compose renders,
+  Bash syntax, ShellCheck,
   Python/JavaScript/PHP syntax, JSON/XML, Caddy validation, module invariants,
   unsafe-pattern checks, and update-major policy.
-- `actionlint` passed for the expanded CI workflow. PR #2's full-history
-  Gitleaks job passed for head `2bea9e7` before this pause.
+- GitHub Actions run `31730633740` for exact PR head `520c239` passed all four
+  jobs: `static-validation`, full-history `secret-scan`, `isolated-modules`, and
+  `disposable-office`. The combined job took 13m25s.
 - Isolated Collabora image/health/discovery/restart testing passed. This was not
   a full WOPI document edit test.
 - Isolated TURN authenticated allocation and secret-rotation testing passed;
@@ -81,8 +84,7 @@ repository are dated evidence only, not a current live verification.
   including the fictional workflow and least-privilege WebDAV checks. Targeted
   Intranet Lite reconciliation passed twice, including fictional content,
   editor/reader roles, the confidential-area boundary, and OCS search-provider
-  availability. These targeted runs do not replace the pending combined
-  backup/restore and deactivation-preservation run.
+  availability.
 - A targeted disposable Intranet run after the protected-app fix passed module
   activation, health gates, group-union visibility for restrictable apps,
   logical disable with WebDAV data preservation, reactivation, metrics, app
@@ -100,19 +102,22 @@ repository are dated evidence only, not a current live verification.
   declarative app reconciliation, WebDAV byte roundtrip, app restart persistence,
   and a second idempotent deployment. That run predates the latest combined
   HR/Intranet/Talk/recovery hardening.
+- The exact-head combined run installed a clean Nextcloud core; reconciled HR
+  Lite, Intranet Lite, and Talk twice where applicable; proved module health
+  gates and content-preserving logical deactivation/reactivation; exercised a
+  Talk room/participant/message/outsider flow; and passed the automated Admin
+  Center plus ordinary-user portal browser flow. It then restarted the app,
+  applied a second semantically idempotent deployment, and preserved the
+  synthetic WebDAV file.
+- That run also created a consistent PostgreSQL/files backup with checksums and
+  version/revision metadata, round-tripped it through a temporary encrypted
+  Restic repository, and restored it into a completely empty random target.
+  Restored `occ status`, maintenance repair, database, Redis, cron, synthetic
+  WebDAV bytes, and share metadata passed. This local temporary Restic proof is
+  explicitly not evidence of a real offsite provider.
 
-## Explicitly not completed in this paused stage
+## Explicitly not completed
 
-- The complete disposable test with browser Admin Center, recovery, HR Lite,
-  Intranet Lite, and Talk flags has not yet passed on the exact final code head.
-  Run `31720924809` for `2bea9e7` completed with static validation, full-history
-  secret scan, and isolated modules green. The combined job reached the module
-  controls and then failed at the healthy-core metrics assertion. Exporter and
-  assertion formats agree; the direct `occ | rg -q` pipeline was nondeterministic
-  under `pipefail` because `rg` can close the pipe after its first match. The
-  harness now captures the complete metrics output before asserting it. Browser
-  Admin Center, combined redeployment, and Nextcloud recovery still require the
-  immutable result of the follow-up run.
 - Collabora create/open/edit/reload through WOPI was not automated or verified;
   only service/discovery/restart behavior was tested.
 - Real Talk browser media quality, NAT traversal, audio/video, and HPB were not
@@ -121,19 +126,17 @@ repository are dated evidence only, not a current live verification.
   mail delivery were not verified; only the external TLS health contract exists.
 - HR Lite and Intranet Lite app-specific objects that lack stable provisioning
   APIs were not accepted manually. No manual UI acceptance is part of this task.
-- GitHub CI for the local handoff and metrics-race fix has not run; they are not
-  yet pushed.
 - README/architecture/operations/Codex prompt/changelog branding consolidation,
   `docs/NICE_TO_HAVE.md`, and `docs/VERIFICATION_MATRIX.md` are still unfinished.
-- Draft PR #2 is open and deliberately remains a draft. No PR was merged.
-- Local `main` was not advanced or synchronized to the feature branch.
+- HR/Intranet application-specific content was included in the successful full
+  Nextcloud backup/restore, but the restored target did not run dedicated
+  post-restore assertions for every HR/Intranet object.
 - Nothing was verified on the NUC, from the public Internet, or in production.
 
 ## Resume point
 
-Start with `.agent/TODO.md`. Push the local handoff and deterministic metrics
-assertion, then inspect the immutable follow-up GitHub Actions run for its exact
-head. Continue from its first proven failure, or record the browser/recovery
-evidence if it passes. Documentation and the verification matrix remain a later
-workstream. The user explicitly authorized commit, merge, push, and sync in the
-current continuation; production remains out of scope.
+Start with `.agent/TODO.md` and inspect live Git/PR state. The next coherent
+workstream is the unfinished Essentials+ Office documentation, verification
+matrix, and honest remaining module-depth work. Preserve every production
+boundary above; no NUC, DNS, Caddy, public ingress, real backup, or real user
+work was authorized or performed.

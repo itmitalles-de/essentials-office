@@ -3,29 +3,27 @@
 This is the authoritative repository handoff. Do not create a competing root
 task list, infer live state from dated evidence, or touch production systems.
 
-## Now — paused autonomous validation
+## Now — documentation and remaining depth
 
 - [x] Finish the disposable TLS Vaultwarden browser flow: synthetic account
   login, organization, collection, owner/member roles, and group; then rerun
   consistent SQLite backup, checksum verification, encrypted temporary Restic
   roundtrip, and restore to a completely empty target.
-- [ ] Run the combined clean deployment harness with automated browser Admin
+- [x] Run the combined clean deployment harness with automated browser Admin
   Center, recovery, HR Lite, Intranet Lite, and Talk flows. Prove second-run
   idempotence, permissions, restart persistence, WebDAV data/share recovery,
   content/volume preservation across logical module deactivation, and complete
-  resource cleanup. GitHub Actions run `31720924809` for exact PR head `2bea9e7`
-  passed static validation, full-history secret scan, and isolated modules. Its
-  combined job reached module controls and failed at a pipefail-sensitive
-  `occ | rg -q` metrics assertion. The harness now captures complete metrics
-  output before matching it. Targeted Intranet and Talk flows pass activation,
-  permissions, disable preservation, restart, and second deployment; browser
-  Admin Center and combined recovery still need the follow-up run result.
-- [ ] Correct every failure found by that combined run. Do not weaken assertions
+  resource cleanup. Exact-head GitHub Actions run `31730633740` passed all four
+  jobs for `520c239`; its 13m25s combined job completed the automated browser,
+  second deployment, encrypted temporary Restic, empty-target restore,
+  WebDAV/share, cron, and cleanup path.
+- [x] Correct every failure found by that combined run. Do not weaken assertions
   merely to make the suite green, and do not claim app-specific objects that
   could not be provisioned through supported interfaces.
-- [ ] Inspect the complete diff against `main`. The exact-tree local static
-  suite, ShellCheck container, actionlint, JSON/XML/template checks, and PR-head
-  full-history gitleaks passed before this pause.
+- [x] Inspect the complete diff against current `origin/main`. The branch is 17
+  commits ahead and 0 behind, with 128 intended changed files; PR #2 has no
+  review or issue comments. Exact-head static validation and full-history
+  Gitleaks passed.
 - [ ] Update visible branding and documentation to **Essentials+ Office**:
   README, architecture, operations, backup/restore, security, module overview,
   `docs/CODEX_PROMPT.md`, changelog, agent decisions/architecture, and handoff.
@@ -34,21 +32,22 @@ task list, infer live state from dated evidence, or touch production systems.
   NUC, public external, and production. Mark unsupported claims as unverified.
 - [ ] Create `docs/NICE_TO_HAVE.md` containing only the requested future items;
   add no code, stubs, images, or dependencies for them.
-- [ ] Push the local pause-handoff commit plus any later focused fixes to
-  `agent/essentials-office-autonomous`. Code fixes are already pushed through
-  `2bea9e7`; superseding PR #2 remains draft and neither PR was merged.
+- [x] Push the focused handoff and validation fixes to
+  `agent/essentials-office-autonomous`. Code and dated verification evidence are
+  pushed through runtime head `520c239` plus the following handoff-only update;
+  inspect GitHub for the live state of superseding PR #2.
 
 ## Functional gaps to resolve or document honestly
 
 - [ ] Automate Collabora create/open/edit/reload through WOPI if it can be done
   reproducibly without weakening the service boundary. Current evidence covers
   only health, discovery, host allow-list, and restart recovery.
-- [ ] Verify Talk P2P room/participant/message/permission flows in the combined
-  run. The targeted disposable flow passes, including disable/reactivation data
-  preservation; confirm it in run `31720924809`. Keep TURN optional; implement
+- [x] Verify Talk P2P room/participant/message/permission flows in the combined
+  run. The disposable flow passes, including outsider rejection and logical
+  disable/reactivation data preservation. Keep TURN optional; implement
   HPB only if cleanly reproducible and separated. Never infer real NAT/media
   quality from a local test.
-- [ ] Verify HR Lite fictional directory, onboarding/offboarding, absence,
+- [x] Verify HR Lite fictional directory, onboarding/offboarding, absence,
   responsibilities, templates, protected files, and least-privilege groups.
 - [ ] Verify Intranet Lite fictional content, editors/readers, confidential area,
   search/API availability, backup/restore, and content-preserving deactivation.
@@ -87,4 +86,8 @@ task list, infer live state from dated evidence, or touch production systems.
 - [x] Proved the closed Vaultwarden product profile, TLS browser organization/
   collection/role/group flow, encrypted backup, and empty-target restore with
   synthetic data only.
+- [x] Passed the exact-head combined clean deployment, automated Admin/user
+  browser flow, HR/Intranet/Talk checks, second deployment, encrypted temporary
+  Restic roundtrip, and full empty-target Nextcloud restore in CI run
+  `31730633740`.
 - [x] Kept all real NUC, Caddy, DNS, network, backups, and user data untouched.
