@@ -6,7 +6,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 DATA_DIR=${VAULTWARDEN_DATA_DIR:-/srv/vaultwarden/data}
 BACKUP_ROOT=${VAULTWARDEN_BACKUP_DIR:-/srv/vaultwarden/backups}
-SQLITE_IMAGE=keinos/sqlite3:3.51.3
+SQLITE_IMAGE=keinos/sqlite3:3.51.3@sha256:520cfebb116119cc642b72d72c3ff948cc120a891dc4d83824c664f1ca65a354
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 WORK_DIR=
 

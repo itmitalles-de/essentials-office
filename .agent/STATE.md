@@ -1,125 +1,104 @@
 # Current State
 
-## Project goal
+## Product and immutable boundaries
 
-Operate **Office**, the Essentials Plus collaboration product, as a reproducible
-self-hosted platform growing from a stable Nextcloud core through independently
-operable modules.
+The visible product name is **Essentials+ Office**. The repository name,
+`cloud.itmitalles.de`, `/opt/nextcloud`, `/srv/nextcloud`, `proxy_net`, internal
+volume names, and the default branch remain unchanged.
 
-## Current status
+No real NUC, Caddy, DNS, router, firewall, Namecheap, backup, or user data was
+read or changed in this work. Every runtime check described below used isolated,
+randomly named disposable Docker resources. Older runtime statements in this
+repository are dated evidence only, not a current live verification.
 
-- Default branch: `main` at `e810fcf` before this handoff migration.
-- The default branch implements the Nextcloud core: Nextcloud 34 Apache,
-  PostgreSQL 17, Redis 7, a dedicated cron container, bootstrap/update/backup/
-  health scripts, shared-Caddy integration, and optional Namecheap IPv4 DDNS.
-- The last runtime state recorded by the repository was verified on 2026-08-12:
-  Nextcloud 34.0.2 was installed on the NUC and the four core containers were
-  healthy. This migration did not independently inspect the NUC.
-- The same recorded state says `cloud.itmitalles.de` was not publicly live.
-- No open GitHub issues were present when this handoff was written.
-- The repository name and deployment paths remain unchanged; no repository
-  rename, DNS, NUC, Caddy, or real-account change was performed in this stage.
+## Branch and pull-request baseline
 
-## Working
+- Current local branch: `agent/essentials-office-autonomous`.
+- The branch incorporates draft PR #1 (`agent/workspace-suite-iac`) and current
+  `origin/main`; PR #1 was not merged.
+- Baseline commits on this branch before the paused validation stage:
+  `bb3d79e`, `b888dcb`, and `b105280`.
+- Draft PR #1 had no review threads. Its static CI failure was independently
+  traced to ShellCheck SC2015; its history gitleaks job passed at that time.
+- The paused stage has not been pushed and PR #1 has not been updated or closed.
 
-- Compose isolates PostgreSQL and Redis on the internal `backend` network.
-- The app reaches shared Caddy through external `proxy_net`; app and cron use a
-  separate egress network.
-- Bootstrap preserves existing secrets/data, creates missing paths, derives the
-  trusted proxy CIDR, and validates Compose.
-- Local consistent backup creation, cron execution, app restart persistence,
-  and core health checks are recorded as tested on 2026-08-12.
-- Namecheap DDNS scripts and systemd units are committed; the recorded host
-  timer was intentionally disabled pending local credentials and DNS setup.
-- An Essentials Plus module contract and Office Admin Center catalog are
-  committed. All optional modules begin inactive. Administrators get the full
-  catalog; ordinary users require both a healthy module and group entitlement.
-- Vaultwarden `1.37.1` is an optional profile with no host port, a private Caddy
-  example, closed signup default, independent SQLite data/secrets/backups, and
-  an isolated synthetic startup/health/backup/empty-target-restore test passed
-  locally on 2026-08-13. It was not configured on the NUC.
-- HR Lite has synthetic templates plus supported OCC/WebDAV/OCS reconciliation
-  and verification scripts. Intranet Lite has optional app/group reconciliation.
-  Neither was run on a Nextcloud host in this work.
-- Visual PBX is represented only by a disabled, credential-free link/health
-  contract. No PBX container, public route, or shared data was added.
+## Implemented on this branch
 
-## Active work
+- A versioned `office-modules.json` contract uses the exact states
+  `not_installed`, `needs_configuration`, `disabled`, `enabled`, and `degraded`
+  and the eight Essentials+ module groups.
+- The AGPL Nextcloud app `essentialsplus` provides an administrator-only catalog,
+  a permission-filtered user portal, an audited API, OCC list/status/enable/
+  disable/doctor/configure/metrics commands, and controlled app reconciliation.
+  It does not run arbitrary commands or control Docker, systemd, Caddy, DNS, or
+  firewall state. Deactivation does not delete module data or volumes.
+- Optional service boundaries remain separate: Collabora, Talk/TURN,
+  Vaultwarden, mail integration, and Essentials+ Calls do not share a database
+  or secrets with the Nextcloud core.
+- Vaultwarden is pinned to `1.37.1` by digest, closed to registration by default,
+  has no product host port, and keeps SQLite data, secrets, backup, and restore
+  paths separate from Nextcloud.
+- Synthetic HR Lite and Intranet Lite fixtures and idempotent OCC/WebDAV/OCS
+  reconciliation/verification paths are present. They use fictional identities
+  and supported application interfaces, not direct Nextcloud SQL changes.
+- Talk TURN configuration no longer places the shared secret in process
+  arguments. Redis authentication no longer places its password on the command
+  line. Backup metadata now records repository/app/image evidence with secrets
+  redacted. Metrics contain health/age/version state but no user data or secrets.
+- Essentials+ Calls remains disabled by default and has only an external URL,
+  health/version contract. No PBX code, credentials, proxy route, or database
+  was added. Mail remains an integration contract, not an embedded mailcow stack.
 
-- Draft PR #1, `agent/workspace-suite-iac`, proposes a much larger reproducible
-  deployment layer, offsite backup/restore tooling, app reconciliation,
-  Collabora/Talk overlays, CI, and mailcow integration guidance.
-- None of PR #1 is part of `main` yet. Review and validate it before merge, and
-  do not infer that its modules are deployed.
+## Verification evidence (2026-08-13, disposable only)
 
-## Recently completed
+- `scripts/validate-static.sh` passed before the final Vaultwarden test-harness
+  edits: all base/profile/overlay Compose renders, Bash syntax, ShellCheck,
+  Python/JavaScript/PHP syntax, JSON/XML, Caddy validation, module invariants,
+  unsafe-pattern checks, and update-major policy.
+- `actionlint` passed for the expanded CI workflow.
+- Isolated Collabora image/health/discovery/restart testing passed. This was not
+  a full WOPI document edit test.
+- Isolated TURN authenticated allocation and secret-rotation testing passed;
+  no host port was published.
+- Local TLS fake-service contracts for IMAP/SMTP and Essentials+ Calls passed.
+- The closed Vaultwarden product profile became healthy without a host port.
+  An earlier version of the isolated SQLite backup/checksum/empty-target restore
+  and encrypted temporary Restic roundtrip passed.
+- The strengthened Vaultwarden browser run proved TLS enforcement and reached
+  successful synthetic account creation (`#/setup-extension`). It was then
+  intentionally interrupted at the user's request. Its trap removed the random
+  containers, network, data, and secret files.
+- An earlier clean disposable Nextcloud core run on this branch passed install,
+  declarative app reconciliation, WebDAV byte roundtrip, app restart persistence,
+  and a second idempotent deployment. That run predates the latest combined
+  HR/Intranet/Talk/recovery hardening.
 
-- Documented Workspace Suite scope, architecture, rollout order, and current
-  deployment status.
-- Added a safe Namecheap IPv4 DDNS updater and timer installer.
-- Added a generic root handoff in `e810fcf`; this migration replaced it with
-  the single `.agent/TODO.md` task source.
+## Explicitly not completed in this paused stage
 
-## Known issues
+- The strengthened Vaultwarden Web Vault flow did **not** yet finish login,
+  organization, collection, member-role, and group verification; its subsequent
+  SQLite/Restic backup and empty-target restore were therefore not rerun.
+- The complete disposable test with browser Admin Center, recovery, HR Lite,
+  Intranet Lite, and Talk flags was not run after the latest changes.
+- Collabora create/open/edit/reload through WOPI was not automated or verified;
+  only service/discovery/restart behavior was tested.
+- Real Talk browser media quality, NAT traversal, audio/video, and HPB were not
+  tested or claimed. HPB was not implemented.
+- Nextcloud Mail account configuration against the fake server and productive
+  mail delivery were not verified; only the external TLS health contract exists.
+- HR Lite and Intranet Lite app-specific objects that lack stable provisioning
+  APIs were not accepted manually. No manual UI acceptance is part of this task.
+- Full-history gitleaks, the final static suite after the last edits, and GitHub
+  CI for this paused commit have not yet run.
+- README/architecture/operations/Codex prompt/changelog branding consolidation,
+  `docs/NICE_TO_HAVE.md`, and `docs/VERIFICATION_MATRIX.md` are still unfinished.
+- No commit from this paused stage was pushed, no superseding draft PR was
+  opened, and no PR was merged.
+- Nothing was verified on the NUC, from the public Internet, or in production.
 
-- Public DNS, genuinely external TCP 80/443 reachability, and shared-Caddy
-  configuration reconciliation are not verified complete.
-- Local backups share the same NVMe as the service. Restore testing and encrypted
-  offsite storage are still required before production data migration.
-- The recorded DDNS path supports IPv4 `A` records only; it does not solve a
-  changing IPv6 prefix or CGNAT/DS-Lite.
-- Collabora, production Talk infrastructure, mailcow, declarative app management,
-  and OIDC/SSO are planned or proposed, not implemented on `main`.
-- Vaultwarden's private DNS/Caddy integration, Office Admin Center Collective,
-  HR Lite Forms/Tables/Deck/Calendar/Collectives target state, Intranet Lite UI
-  state, and real user visibility checks are not host-verified.
-- Visual PBX cannot be activated until its separate product supplies auth,
-  roles, secure SIP secret storage, a health endpoint, and a cleared
-  rights/participation/operations position.
-- User/group policy, retention, sharing policy, and Dropbox migration planning
-  remain undefined.
+## Resume point
 
-## Next recommended tasks
-
-1. On an approved disposable target, configure private Vaultwarden Caddy/DNS,
-   create a synthetic Web Vault owner/organisation/2FA flow, and prove restore
-   with the protected local environment file before enabling an entitlement.
-2. Complete and verify Office Admin Center, Intranet Lite, and HR Lite manual UI
-   target states with fictional accounts and group-visibility testing.
-3. Review draft PR #1 and separately reconcile Caddy/DNS/offsite recovery;
-   maintain the distinction between committed code and verified host state.
-
-The authoritative prioritized list is `.agent/TODO.md`.
-
-## Relevant files
-
-- `README.md`: deployment, operations, security, and open operational items
-- `docs/ARCHITECTURE.md`: product ownership and rollout order
-- `compose.yaml`: implemented core topology on `main`
-- `scripts/bootstrap.sh`, `scripts/backup.sh`, `scripts/update.sh`: lifecycle
-- `scripts/healthcheck.sh`: host/runtime validation
-- `secrets/README.md`: secret-storage boundary
-- `Caddyfile.example`: shared-proxy site fragment
-- `office-modules.json`: versioned Office module and entitlement contract
-- `docs/office/`: Admin Center, Vaultwarden, HR Lite, and Intranet Lite guides
-- `docs/integrations/VISUAL_PBX.md`: disabled PBX boundary and release gates
-
-## Validation
-
-- Documentation migration: repository links and referenced paths checked.
-- `bash -n scripts/*.sh` is safe to run without a deployment.
-- `docker compose config -q` requires a populated local `.env`; use a temporary
-  environment derived from `.env.example` for static validation.
-- Runtime health, DNS, TLS, restore, and public reachability were not revalidated
-  on the NUC during the earlier documentation-only migration.
-- On 2026-08-13 the local isolated `tests/vaultwarden-backup-restore.sh` passed:
-  pinned profile start/health, no host port, SQLite backup integrity, and empty
-  target restore with synthetic data. Static base/overlay Compose, shell syntax,
-  contract JSON, and secret scan also passed locally. HR/Office host checks were
-  not run because no approved target deployment was supplied.
-
-## Last handoff
-
-2026-08-13: implemented the Office modular contract, inactive Vaultwarden,
-HR Lite, Intranet Lite, and Visual PBX boundary. Reconfirm commit/branch and
-CI status after committing/pushing this change.
+Start with `.agent/TODO.md`. First finish the Vaultwarden browser flow, then run
+the complete disposable suite and final scans. Update documentation only from
+those results, split any subsequent work into focused commits, push the current
+branch, and open a superseding draft PR without merging it.

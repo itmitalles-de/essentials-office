@@ -40,7 +40,7 @@ if [ "${EUID}" -ne 0 ]; then
   exec sudo -- "$0" "$@"
 fi
 
-for command in docker grep mktemp tar; do
+for command in awk cmp curl docker grep jq mktemp sha256sum tar; do
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
 done
 docker compose version >/dev/null 2>&1 || die 'Docker Compose v2 is required'
@@ -129,7 +129,45 @@ compose exec -T -u www-data app php occ maintenance:mode --off >/dev/null
 status=$(compose exec -T -u www-data app php occ status --output=json)
 printf '%s\n' "$status" | grep -Eq '"installed"[[:space:]]*:[[:space:]]*true' || die 'restored Nextcloud is not installed'
 printf '%s\n' "$status" | grep -Eq '"maintenance"[[:space:]]*:[[:space:]]*false' || die 'restored Nextcloud remained in maintenance mode'
+compose exec -T -u www-data app php occ maintenance:repair >/dev/null
+post_repair_status=$(compose exec -T -u www-data app php occ status --output=json)
+printf '%s\n' "$post_repair_status" | grep -Eq '"needsDbUpgrade"[[:space:]]*:[[:space:]]*false' || die 'restored Nextcloud requires a database upgrade after repair'
 compose exec -T db sh -ec 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
-compose exec -T redis sh -ec 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping | grep -qx PONG'
+compose exec -T redis sh -ec 'REDISCLI_AUTH="$REDIS_PASSWORD" exec redis-cli --no-auth-warning ping' | grep -qx PONG
 
-printf 'restore-test: disposable restore passed for %s\n' "$(basename -- "$backup_dir")"
+verify_user=$(awk -F= '$1 == "RECOVERY_TEST_USER" {sub(/^[^=]*=/, ""); print; exit}' "$ENV_FILE")
+verify_password=$(awk -F= '$1 == "RECOVERY_TEST_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$ENV_FILE")
+verify_owner=$(awk -F= '$1 == "NEXTCLOUD_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' "$ENV_FILE")
+if [ -n "$verify_user" ] || [ -n "$verify_password" ]; then
+  [ -n "$verify_user" ] && [ -n "$verify_password" ] && [ -n "$verify_owner" ] || die 'restore verification credentials are incomplete'
+  netrc="$WORK_DIR/verify.netrc"
+  downloaded="$WORK_DIR/recovered-file"
+  chmod 0600 "$netrc"
+  printf 'machine 127.0.0.1 login %s password %s\n' "$verify_user" "$verify_password" >"$netrc"
+  compose cp "$netrc" app:/tmp/restore-verify.netrc >/dev/null
+  compose exec -T app chmod 0600 /tmp/restore-verify.netrc
+  compose exec -T app curl --fail --silent --show-error \
+    --header 'Host: restore.invalid' --netrc-file /tmp/restore-verify.netrc \
+    --output /tmp/recovered-file \
+    "http://127.0.0.1/remote.php/dav/files/$verify_user/essentialsplus-recovery.txt" >/dev/null
+  compose cp app:/tmp/recovered-file "$downloaded" >/dev/null
+  printf 'Essentials+ Office synthetic backup and share fixture\n' | cmp -- - "$downloaded" ||
+    die 'restored shared WebDAV file content differs from the source fixture'
+  share_count=$(compose exec -T -u www-data app php occ sharing:share:list --output=json 2>/dev/null \
+    | jq --arg owner "$verify_owner" '[.[]? | select(.owner == $owner or .uid_owner == $owner)] | length' 2>/dev/null || printf 0)
+  if [ "$share_count" -eq 0 ]; then
+    shares=$(compose exec -T app curl --fail --silent --show-error \
+      --header 'Host: restore.invalid' --header 'OCS-APIRequest: true' --header 'Accept: application/json' \
+      --netrc-file /tmp/restore-verify.netrc \
+      'http://127.0.0.1/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json&shared_with_me=true')
+    jq -e '.ocs.data | length > 0' <<<"$shares" >/dev/null || die 'restored share metadata is missing'
+  fi
+  unset verify_password
+fi
+
+compose up --detach cron >/dev/null
+compose ps --status running --services | grep -Fxq cron || die 'restored cron service is not running'
+compose exec -T -u www-data app php occ config:app:set essentialsplus evidence.restore_test \
+  --value="$(date +%s)" >/dev/null 2>&1 || true
+
+printf 'restore-test: empty-target restore, repair, cron, and optional WebDAV/share proof passed for %s\n' "$(basename -- "$backup_dir")"

@@ -7,6 +7,7 @@ PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}
 HR_LITE_SECRETS_FILE=${HR_LITE_SECRETS_FILE:-"$PROJECT_DIR/.hr-lite-demo.env"}
 BASE_URL=
+ALLOW_TEST_HTTP=false
 
 die() {
   printf 'hr-lite-verify: %s\n' "$*" >&2
@@ -20,8 +21,9 @@ while [ "$#" -gt 0 ]; do
       BASE_URL=${2%/}
       shift 2
       ;;
+    --allow-test-http) ALLOW_TEST_HTTP=true; shift ;;
     -h|--help)
-      printf '%s\n' 'Usage: ./scripts/hr-lite-verify.sh [--url https://cloud.example.internal]'
+      printf '%s\n' 'Usage: ./scripts/hr-lite-verify.sh [--url https://cloud.example.internal] [--allow-test-http]'
       exit 0
       ;;
     *) die "unknown argument: $1" ;;
@@ -63,14 +65,20 @@ for pair in 'hr-demo-admin:hr-admin' 'manager-demo:manager' 'employee-demo:emplo
 done
 
 if [ -n "$BASE_URL" ]; then
+  if [ "$ALLOW_TEST_HTTP" = true ]; then
+    [[ "$BASE_URL" =~ ^http://127\.0\.0\.1:[0-9]+$ ]] || die 'test HTTP mode accepts loopback with an explicit port only'
+  else
+    [[ "$BASE_URL" =~ ^https:// ]] || die 'verification URL must use HTTPS outside explicit test mode'
+  fi
   [ -f "$HR_LITE_SECRETS_FILE" ] || die 'missing HR Lite demo secret file for WebDAV permission test'
   [ "$(stat -c '%a' "$HR_LITE_SECRETS_FILE")" = 600 ] || die 'HR Lite demo secret file must have mode 0600'
   admin_password=$(secret_value HR_LITE_ADMIN_PASSWORD)
   manager_password=$(secret_value HR_LITE_MANAGER_PASSWORD)
-  url_host=${BASE_URL#https://}
+  url_host=${BASE_URL#*://}
   admin_netrc=$(mktemp)
   manager_netrc=$(mktemp)
-  trap 'rm -f -- "$admin_netrc" "$manager_netrc"' EXIT INT TERM
+  employee_netrc=
+  trap 'rm -f -- "$admin_netrc" "$manager_netrc" "$employee_netrc"' EXIT INT TERM
   chmod 600 "$admin_netrc" "$manager_netrc"
   printf 'machine %s login hr-demo-admin password %s\n' "$url_host" "$admin_password" >"$admin_netrc"
   printf 'machine %s login manager-demo password %s\n' "$url_host" "$manager_password" >"$manager_netrc"
@@ -82,6 +90,19 @@ if [ -n "$BASE_URL" ]; then
   manager_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
     --netrc-file "$manager_netrc" --request PROPFIND -H 'Depth: 0' "$manager_url")
   case "$manager_status" in 403|404) ;; *) die "manager unexpectedly reached protected folder (HTTP $manager_status)" ;; esac
+  employee_password=$(secret_value HR_LITE_EMPLOYEE_PASSWORD)
+  employee_netrc=$(mktemp)
+  chmod 600 "$employee_netrc"
+  printf 'machine %s login employee-demo password %s\n' "$url_host" "$employee_password" >"$employee_netrc"
+  employee_url="$BASE_URL/remote.php/dav/files/employee-demo/HR%20Lite%20-%20Confidential"
+  employee_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+    --netrc-file "$employee_netrc" --request PROPFIND -H 'Depth: 0' "$employee_url")
+  case "$employee_status" in 403|404) ;; *) die "employee unexpectedly reached protected folder (HTTP $employee_status)" ;; esac
+  for fixture in employee-directory.csv absence-requests.csv responsibilities.csv workflow-target.json; do
+    status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+      --netrc-file "$admin_netrc" --request HEAD "$folder_url/$fixture")
+    [ "$status" = 200 ] || die "synthetic HR workflow fixture is missing: $fixture (HTTP $status)"
+  done
 fi
 
 printf 'hr-lite-verify: group, app, and fictional-account target state passed\n'

@@ -19,17 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install --yes shellcheck
-      - name: Validate Compose and shell scripts
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install --yes jq nodejs python3-jsonschema shellcheck
+      - name: Validate Compose, schemas, templates, and source
         run: ./scripts/validate-static.sh
+      - name: Validate GitHub Actions workflow
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/repo:ro"
+          --workdir /repo
+          rhysd/actionlint:1.7.7@sha256:1d74bfc9fd1963af8f89a7c22afaaafd42f49aad711a09951d02cb996398f61d
 
   secret-scan:
     runs-on: ubuntu-latest
     steps:
       - name: Check out full history
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
         with:
           fetch-depth: 0
       - name: Scan Git history with Gitleaks
@@ -39,5 +45,43 @@ jobs:
           ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
           git --redact --no-banner /repo
 
-  # Runtime health, DNS, Caddy, WebDAV and restore tests require the real host
-  # and are intentionally not simulated on a GitHub-hosted runner.
+  isolated-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Install Chromium and matching ChromeDriver
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd # v2.1.2
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+      - name: Install disposable-test tools
+        run: sudo apt-get update && sudo apt-get install --yes jq restic
+      - name: Test Vaultwarden Web Vault and recovery
+        run: ./tests/vaultwarden-backup-restore.sh
+      - name: Test isolated Collabora health
+        run: ./tests/collabora-health.sh
+      - name: Test Talk TURN and credential rotation
+        run: ./tests/talk-turn.sh
+      - name: Test Mail and Essentials+ Calls contracts
+        run: ./tests/external-contracts.sh
+
+  disposable-office:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Install Chromium and matching ChromeDriver
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd # v2.1.2
+        with:
+          chrome-version: stable
+          install-chromedriver: true
+      - name: Install recovery tools
+        run: sudo apt-get update && sudo apt-get install --yes jq restic ripgrep rsync
+      - name: Test clean deployment, modules, browser, and recovery
+        run: sudo --preserve-env=GITHUB_ACTIONS,GITHUB_WORKSPACE ./tests/deploy/run.sh --browser --recovery --hr --intranet --talk
+
+  # Real DNS, Caddy, Internet ingress, NUC resources, TLS, offsite storage,
+  # mail delivery, NAT media quality, and production use remain explicit external
+  # gates. CI never reaches or mutates those systems.

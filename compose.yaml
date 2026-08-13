@@ -34,13 +34,19 @@ services:
     command:
       - /bin/sh
       - -ec
-      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+      - |
+        umask 077
+        printf 'appendonly yes\nrequirepass %s\n' "$$REDIS_PASSWORD" > /run/redis/redis.conf
+        chown redis:redis /run/redis /run/redis/redis.conf
+        exec /usr/bin/setpriv --reuid redis --regid redis --clear-groups redis-server /run/redis/redis.conf
+    tmpfs:
+      - /run/redis:size=1m,mode=0700
     volumes:
       - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/redis:/data
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -qx PONG"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli --no-auth-warning ping | grep -qx PONG"]
       interval: 10s
       timeout: 5s
       retries: 10

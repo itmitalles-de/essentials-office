@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "directory": "employee-directory.csv",
+  "onboardingForm": {
+    "title": "HR Lite – Onboarding",
+    "fields": ["employee_ref", "manager", "start_date", "equipment", "access", "responsible"]
+  },
+  "checklists": ["onboarding-checklist.md", "offboarding-checklist.md"],
+  "absenceWorkflow": {
+    "file": "absence-requests.csv",
+    "states": ["submitted", "manager_review", "approved", "rejected", "cancelled"]
+  },
+  "responsibilities": "responsibilities.csv",
+  "protectedDocumentArea": "HR Lite - Confidential"
+}

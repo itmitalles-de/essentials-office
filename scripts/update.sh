@@ -18,19 +18,14 @@ command -v docker >/dev/null 2>&1 || die 'Docker is required'
 [ -f "$PROJECT_DIR/.env" ] || die 'missing .env; run bootstrap.sh first'
 cd "$PROJECT_DIR"
 docker compose config -q
-
-mapfile -t images < <(docker compose config --images | sort -u)
-expected_images=(nextcloud:34-apache postgres:17-alpine redis:7-alpine)
-for image in "${expected_images[@]}"; do
-  printf '%s\n' "${images[@]}" | grep -Fxq "$image" || die "required pinned image is missing: $image"
-done
-if [ "${#images[@]}" -ne "${#expected_images[@]}" ]; then
-  die 'compose.yaml contains an unexpected image; inspect the change before updating'
-fi
+"$SCRIPT_DIR/verify-image-policy.sh" "$PROJECT_DIR/compose.yaml"
 
 "$SCRIPT_DIR/backup.sh"
+before_images=$(docker compose images --format json 2>/dev/null || true)
 docker compose pull
 docker compose up -d
 docker compose exec -T -u www-data app php occ status --output=json
 "$SCRIPT_DIR/healthcheck.sh"
+mkdir -p "$PROJECT_DIR/reports"
+printf '%s\n' "$before_images" >"$PROJECT_DIR/reports/update-rollback-images-$(date -u +%Y%m%dT%H%M%SZ).jsonl"
 printf 'update: completed without a major-version change\n'

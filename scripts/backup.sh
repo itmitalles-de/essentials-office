@@ -51,6 +51,7 @@ command -v docker >/dev/null 2>&1 || die 'Docker is required'
 command -v tar >/dev/null 2>&1 || die 'tar is required'
 command -v flock >/dev/null 2>&1 || die 'flock is required'
 command -v sha256sum >/dev/null 2>&1 || die 'sha256sum is required'
+command -v jq >/dev/null 2>&1 || die 'jq is required'
 [ -f "$PROJECT_DIR/.env" ] || die "missing $PROJECT_DIR/.env; run bootstrap.sh first"
 
 DATA_ROOT=$(env_value NEXTCLOUD_DATA_ROOT)
@@ -101,6 +102,12 @@ if git -C "$PROJECT_DIR" rev-parse HEAD >"$WORK_DIR/repository-commit.txt" 2>/de
 else
   printf 'unknown\n' >"$WORK_DIR/repository-commit.txt"
 fi
+app_versions=$(docker compose exec -T -u www-data app php occ app:list --output=json)
+image_metadata=$(docker compose config --images | sort -u | while IFS= read -r image; do
+  docker image inspect "$image" --format '{{json .}}' | jq -c '{requested: .RepoTags[0], imageId: .Id, repoDigests: (.RepoDigests // [])}'
+done | jq -s .)
+jq -n --arg createdAt "$STAMP" --argjson apps "$app_versions" --argjson images "$image_metadata" \
+  '{createdAt: $createdAt, apps: $apps, images: $images}' >"$WORK_DIR/versions.json"
 printf '%s\n' \
   'Database restore source: nextcloud.pg.dump (custom pg_dump format).' \
   'Filesystem archive includes html and data; PostgreSQL is represented by the logical dump and Redis is intentionally rebuilt empty.' \
@@ -119,4 +126,6 @@ CRON_STOPPED=false
 
 mv -- "$WORK_DIR" "$FINAL_DIR"
 WORK_DIR=
+docker compose exec -T -u www-data app php occ config:app:set essentialsplus evidence.backup \
+  --value="$(date +%s)" >/dev/null 2>&1 || true
 printf 'backup: created %s\n' "$FINAL_DIR"

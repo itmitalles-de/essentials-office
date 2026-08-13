@@ -5,6 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 TARGET_DIR=${TURN_CONFIG_DIR:-/etc/nextcloud}
+TURN_RUNTIME_GID=${TURN_RUNTIME_GID:-65534}
 CONFIG_FILE="$TARGET_DIR/turnserver.conf"
 SECRET_FILE="$TARGET_DIR/talk-turn.secret"
 TEMPLATE="$PROJECT_DIR/config/turnserver.conf.example"
@@ -20,6 +21,7 @@ realm=$1
 external_ip=$2
 [[ "$realm" =~ ^[A-Za-z0-9.-]+$ ]] || die 'TURN_REALM must be a DNS hostname'
 [[ "$external_ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die 'PUBLIC_IPV4 must be an IPv4 address'
+[[ "$TURN_RUNTIME_GID" =~ ^[0-9]+$ ]] || die 'TURN_RUNTIME_GID must be numeric'
 [ -f "$TEMPLATE" ] || die "missing template: $TEMPLATE"
 
 install -d -o root -g root -m 0700 "$TARGET_DIR"
@@ -40,14 +42,16 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT INT TERM
-sed -e "s/@TURN_REALM@/$realm/g" \
-  -e "s/@TURN_EXTERNAL_IP@/$external_ip/g" \
-  -e "s/@TURN_SECRET@/$secret/g" \
-  "$TEMPLATE" >"$rendered"
-chown root:root "$rendered"
-chmod 0600 "$rendered"
+while IFS= read -r line || [ -n "$line" ]; do
+  line=${line//@TURN_REALM@/$realm}
+  line=${line//@TURN_EXTERNAL_IP@/$external_ip}
+  line=${line//@TURN_SECRET@/$secret}
+  printf '%s\n' "$line"
+done <"$TEMPLATE" >"$rendered"
+chown "root:$TURN_RUNTIME_GID" "$rendered"
+chmod 0640 "$rendered"
 if [ ! -f "$CONFIG_FILE" ] || ! cmp --silent "$rendered" "$CONFIG_FILE"; then
-  install -o root -g root -m 0600 "$rendered" "$CONFIG_FILE"
+  install -o root -g "$TURN_RUNTIME_GID" -m 0640 "$rendered" "$CONFIG_FILE"
 fi
 
 printf 'install-talk-turn-config: protected coturn configuration is ready in %s\n' "$TARGET_DIR"

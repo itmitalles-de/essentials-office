@@ -24,9 +24,9 @@ fi
 [[ "$TURN_SERVER" =~ ^[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || die 'TURN_SERVER must be a bare host:port value'
 [ -f "$SECRET_FILE" ] || die "missing TURN secret file: $SECRET_FILE"
 [ "$(stat -c '%u:%a' "$SECRET_FILE")" = 0:600 ] || die "$SECRET_FILE must be root-owned with mode 0600"
-secret=$(<"$SECRET_FILE")
-[[ "$secret" =~ ^[[:xdigit:]]{64}$ ]] || die "$SECRET_FILE has an unexpected format"
-trap 'unset secret' EXIT INT TERM
+IFS= read -r secret_format_check <"$SECRET_FILE"
+[[ "$secret_format_check" =~ ^[[:xdigit:]]{64}$ ]] || die "$SECRET_FILE has an unexpected format"
+unset secret_format_check
 
 cd "$PROJECT_DIR"
 compose=(docker compose -f compose.yaml -f compose.talk-turn.yaml --profile talk-turn)
@@ -35,6 +35,6 @@ compose=(docker compose -f compose.yaml -f compose.talk-turn.yaml --profile talk
 occ app:list --output=json | grep -q '"spreed"' || die 'Talk is not installed'
 
 "$SCRIPT_DIR/backup.sh"
-occ talk:turn:delete turn "$TURN_SERVER" udp,tcp >/dev/null
-occ talk:turn:add turn "$TURN_SERVER" udp,tcp --secret="$secret" >/dev/null
+TURN_SERVER="$TURN_SERVER" "${compose[@]}" exec -T -u root -e TURN_SERVER app php \
+  <"$SCRIPT_DIR/configure-talk-turn.php"
 printf 'configure-talk-turn: Talk now uses %s over UDP and TCP\n' "$TURN_SERVER"

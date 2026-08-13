@@ -1,0 +1,3 @@
+employee_ref,display_name,department,responsible,start_date,status
+EMP-DEMO-001,Alex Example,Example Operations,HR Demo Administrator,2026-09-01,synthetic
+EMP-DEMO-002,Riley Example,Example Services,Manager Demo,2026-09-15,synthetic

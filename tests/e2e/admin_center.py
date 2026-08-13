@@ -152,7 +152,15 @@ def login(driver: WebDriver, base_url: str, user: str, password: str) -> None:
     )
 
 
-def run_session(endpoint: str, chromium: str, base_url: str, user: str, password: str, admin: bool) -> None:
+def run_session(
+    endpoint: str,
+    chromium: str,
+    base_url: str,
+    user: str,
+    password: str,
+    admin: bool,
+    expected_modules: set[str],
+) -> None:
     driver = WebDriver(endpoint)
     try:
         driver.start(chromium)
@@ -182,12 +190,14 @@ def run_session(endpoint: str, chromium: str, base_url: str, user: str, password
         else:
             driver.navigate(base_url + "/apps/essentialsplus/")
             wait_for(
-                lambda: driver.execute("return document.querySelectorAll('[data-module-id]').length") == 1,
-                "ordinary user did not receive the expected single entitled core module",
+                lambda: driver.execute("return document.querySelectorAll('[data-module-id]').length") == len(expected_modules),
+                "ordinary user did not receive exactly the activated and entitled modules",
             )
-            module_id = driver.execute("return document.querySelector('[data-module-id]').dataset.moduleId")
-            if module_id != "nextcloud-core":
-                fail(f"ordinary user unexpectedly saw module {module_id!r}")
+            module_ids = driver.execute(
+                "return Array.from(document.querySelectorAll('[data-module-id]')).map((node) => node.dataset.moduleId).sort()"
+            )
+            if module_ids != sorted(expected_modules):
+                fail(f"ordinary user module catalog differs: {module_ids!r}")
             driver.navigate(base_url + "/settings/admin/essentialsplus")
             time.sleep(1)
             if "Essentials+ Office Admin-Center" in driver.source():
@@ -206,6 +216,9 @@ def main() -> int:
     user_env = os.environ.get("BROWSER_USER_ENV_FILE", "")
     chromium = os.environ.get("CHROMIUM_BIN", "")
     webdriver_endpoint = os.environ.get("WEBDRIVER_ENDPOINT", "http://127.0.0.1:9515")
+    expected_modules = {
+        value for value in os.environ.get("BROWSER_EXPECTED_MODULES", "nextcloud-core").split(",") if value
+    }
     if not base_url or not core_env or not user_env or not chromium:
         fail("browser test requires base URL, protected env files, and Chromium path")
     core = read_env(pathlib.Path(core_env))
@@ -217,6 +230,7 @@ def main() -> int:
         core["NEXTCLOUD_ADMIN_USER"],
         core["NEXTCLOUD_ADMIN_PASSWORD"],
         True,
+        expected_modules,
     )
     run_session(
         webdriver_endpoint,
@@ -225,6 +239,7 @@ def main() -> int:
         user["BROWSER_USER"],
         user["BROWSER_PASSWORD"],
         False,
+        expected_modules,
     )
     print("admin-center-browser-e2e: admin catalog and ordinary-user visibility passed")
     return 0

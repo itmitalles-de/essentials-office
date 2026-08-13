@@ -6,11 +6,21 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 SOURCE_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd)"
 WITH_APPS=false
 WITH_BROWSER=false
+WITH_RECOVERY=false
+WITH_HR=false
+WITH_INTRANET=false
+WITH_TALK=false
 WORK_DIR=
 DATA_ROOT=
 PROJECT_NAME=
 PROXY_NETWORK=
 CHROMEDRIVER_PID=
+ORIGINAL_ARGS=("$@")
+HR_TEST_BASE=
+INTRANET_TEST_BASE=
+TALK_TEST_BASE=
+TALK_SECRETS_FILE=
+BROWSER_EXPECTED_MODULES=nextcloud-core
 
 die() {
   printf 'deploy-test: %s\n' "$*" >&2
@@ -48,21 +58,31 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --apps) WITH_APPS=true ;;
     --browser) WITH_BROWSER=true; WITH_APPS=true ;;
-    *) die 'usage: tests/deploy/run.sh [--apps] [--browser]' ;;
+    --recovery) WITH_RECOVERY=true; WITH_APPS=true ;;
+    --hr) WITH_HR=true; WITH_APPS=true ;;
+    --intranet) WITH_INTRANET=true; WITH_APPS=true ;;
+    --talk) WITH_TALK=true; WITH_APPS=true ;;
+    *) die 'usage: tests/deploy/run.sh [--apps] [--browser] [--recovery] [--hr] [--intranet] [--talk]' ;;
   esac
   shift
 done
 
 if [ "${EUID}" -ne 0 ]; then
-  exec sudo -- "$0" "$@"
+  if command -v sudo >/dev/null 2>&1; then
+    exec sudo -- "$0" "${ORIGINAL_ARGS[@]}"
+  fi
+  die 'run as root or install sudo for disposable bind-mount ownership setup'
 fi
-for command in awk cmp docker find jq openssl rsync sed sha256sum sort xargs; do
+for command in awk chmod cmp cp curl docker find jq mktemp openssl rg rsync sed sha256sum sort xargs; do
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
 done
 if [ "$WITH_BROWSER" = true ]; then
   for command in chromedriver python3; do
     command -v "$command" >/dev/null 2>&1 || die "browser test requires: $command"
   done
+fi
+if [ "$WITH_RECOVERY" = true ]; then
+  command -v restic >/dev/null 2>&1 || die 'recovery test requires restic'
 fi
 
 WORK_DIR=$(mktemp -d /tmp/workspace-suite-deploy-test.XXXXXX)
@@ -77,7 +97,7 @@ rsync -a \
   --exclude='reports/' \
   --exclude='inventory-*.md' \
   "$SOURCE_DIR/" "$WORK_DIR/"
-if [ "$WITH_BROWSER" = true ]; then
+if [ "$WITH_BROWSER" = true ] || [ "$WITH_HR" = true ] || [ "$WITH_INTRANET" = true ] || [ "$WITH_TALK" = true ]; then
   export COMPOSE_FILE="$WORK_DIR/compose.yaml:$WORK_DIR/tests/deploy/compose.browser.yaml"
 fi
 cp "$WORK_DIR/.env.example" "$WORK_DIR/.env"
@@ -175,7 +195,7 @@ run_browser_e2e() {
     printf 'BROWSER_USER=%s\n' "$browser_user"
     printf 'BROWSER_PASSWORD=%s\n' "$browser_password"
   } >"$browser_secret_file"
-  compose exec -T -u www-data -e "OC_PASS=$browser_password" app php occ user:add \
+  OC_PASS="$browser_password" compose exec -T -u www-data -e OC_PASS app php occ user:add \
     --password-from-env --display-name 'Ordinary Demo User' "$browser_user" >/dev/null
   occ group:add employee >/dev/null 2>&1 || true
   occ group:adduser employee "$browser_user" >/dev/null
@@ -188,7 +208,7 @@ run_browser_e2e() {
   occ config:system:set overwrite.cli.url --value="$browser_base" >/dev/null
   occ config:system:set overwritehost --value="deploy-test.invalid:$browser_port" >/dev/null
 
-  chromium_bin=$(command -v chromium-browser || command -v chromium || true)
+  chromium_bin=$(command -v chromium-browser || command -v chromium || command -v chrome || command -v google-chrome || true)
   [ -n "$chromium_bin" ] || die 'Chromium executable is missing'
   chromedriver --port=9515 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
   CHROMEDRIVER_PID=$!
@@ -196,11 +216,333 @@ run_browser_e2e() {
   BROWSER_BASE_URL="$browser_base" \
   BROWSER_CORE_ENV_FILE="$WORK_DIR/.env" \
   BROWSER_USER_ENV_FILE="$browser_secret_file" \
+  BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES" \
   CHROMIUM_BIN="$chromium_bin" \
     python3 "$WORK_DIR/tests/e2e/admin_center.py"
   kill "$CHROMEDRIVER_PID" >/dev/null 2>&1 || true
   wait "$CHROMEDRIVER_PID" 2>/dev/null || true
   CHROMEDRIVER_PID=
+}
+
+run_recovery_e2e() {
+  local recovery_user recovery_password admin admin_password netrc source_file shares backup_dir restic_stage staged_backup staged_env
+  recovery_user=recovery-demo
+  recovery_password=$(openssl rand -hex 32)
+  admin=$(awk -F= '$1 == "NEXTCLOUD_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
+  admin_password=$(awk -F= '$1 == "NEXTCLOUD_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
+  umask 077
+  {
+    printf 'RECOVERY_TEST_USER=%s\n' "$recovery_user"
+    printf 'RECOVERY_TEST_PASSWORD=%s\n' "$recovery_password"
+  } >>"$WORK_DIR/.env"
+  OC_PASS="$recovery_password" compose exec -T -u www-data -e OC_PASS app php occ user:add \
+    --password-from-env --display-name 'Recovery Demo User' "$recovery_user" >/dev/null
+  netrc="$WORK_DIR/.recovery-admin.netrc"
+  source_file="$WORK_DIR/essentialsplus-recovery.txt"
+  printf 'machine 127.0.0.1 login %s password %s\n' "$admin" "$admin_password" >"$netrc"
+  printf 'Essentials+ Office synthetic backup and share fixture\n' >"$source_file"
+  compose cp "$netrc" app:/tmp/recovery-admin.netrc >/dev/null
+  compose cp "$source_file" app:/tmp/essentialsplus-recovery.txt >/dev/null
+  compose exec -T app chmod 0600 /tmp/recovery-admin.netrc
+  compose exec -T app curl --fail --silent --show-error \
+    --header 'Host: deploy-test.invalid' --netrc-file /tmp/recovery-admin.netrc \
+    --upload-file /tmp/essentialsplus-recovery.txt \
+    "http://127.0.0.1/remote.php/dav/files/$admin/essentialsplus-recovery.txt" >/dev/null
+  shares=$(compose exec -T app curl --fail --silent --show-error \
+    --header 'Host: deploy-test.invalid' --header 'OCS-APIRequest: true' --header 'Accept: application/json' \
+    --netrc-file /tmp/recovery-admin.netrc --request POST \
+    --data-urlencode 'path=/essentialsplus-recovery.txt' --data 'shareType=0' \
+    --data-urlencode "shareWith=$recovery_user" --data 'permissions=1' \
+    'http://127.0.0.1/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json')
+  jq -e '.ocs.meta.statuscode == 100 and (.ocs.data.id | tostring | length > 0)' <<<"$shares" >/dev/null ||
+    die 'could not create synthetic recovery share'
+  unset recovery_password admin_password
+
+  BACKUP_DIR="$DATA_ROOT/backups" "$WORK_DIR/scripts/backup.sh"
+  backup_dir=$(find "$DATA_ROOT/backups" -mindepth 1 -maxdepth 1 -type d -name '20*' -print | sort | tail -n 1)
+  [ -n "$backup_dir" ] || die 'recovery test backup is missing'
+  export RESTIC_REPOSITORY="$WORK_DIR/restic-repository"
+  export RESTIC_PASSWORD_FILE="$WORK_DIR/.restic-password"
+  openssl rand -base64 48 >"$RESTIC_PASSWORD_FILE"
+  chmod 0600 "$RESTIC_PASSWORD_FILE"
+  restic init >/dev/null
+  restic backup --quiet --tag essentialsplus-office-recovery "$backup_dir" "$WORK_DIR/.env"
+  restic check --read-data >/dev/null
+  restic_stage="$WORK_DIR/restic-stage"
+  restic restore latest --target "$restic_stage" >/dev/null
+  staged_backup=$(find "$restic_stage" -type d -name "$(basename -- "$backup_dir")" -path '*/backups/*' -print -quit)
+  staged_env=$(find "$restic_stage" -type f -name .env -print -quit)
+  [ -n "$staged_backup" ] && [ -n "$staged_env" ] || die 'restic restore did not reproduce backup and environment files'
+  RESTORE_ENV_FILE="$staged_env" "$WORK_DIR/scripts/restore-test.sh" "$staged_backup"
+  printf 'deploy-test: encrypted temporary restic backup and full empty-target restore passed\n'
+}
+
+run_hr_e2e() {
+  local port_mapping hr_port hr_base target_hash_before target_hash_after secrets_hash_before secrets_hash_after
+  port_mapping=$(compose port app 80)
+  [[ "$port_mapping" =~ ^127\.0\.0\.1:[0-9]+$ ]] || die "HR test port is not loopback-only: $port_mapping"
+  hr_port=${port_mapping##*:}
+  hr_base="http://127.0.0.1:$hr_port"
+  HR_TEST_BASE=$hr_base
+  export HR_LITE_SECRETS_FILE="$WORK_DIR/.hr-lite-demo.env"
+  NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" HR_LITE_SECRETS_FILE="$HR_LITE_SECRETS_FILE" \
+    "$WORK_DIR/scripts/hr-lite-reconcile.sh" --url "$hr_base" --allow-test-http
+  target_hash_before=$(find "$WORK_DIR/hr-lite" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+  secrets_hash_before=$(sha256sum "$HR_LITE_SECRETS_FILE" | awk '{print $1}')
+  NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" HR_LITE_SECRETS_FILE="$HR_LITE_SECRETS_FILE" \
+    "$WORK_DIR/scripts/hr-lite-reconcile.sh" --url "$hr_base" --allow-test-http
+  target_hash_after=$(find "$WORK_DIR/hr-lite" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+  secrets_hash_after=$(sha256sum "$HR_LITE_SECRETS_FILE" | awk '{print $1}')
+  [ "$target_hash_before" = "$target_hash_after" ] || die 'HR Lite target fixtures changed during reconciliation'
+  [ "$secrets_hash_before" = "$secrets_hash_after" ] || die 'HR Lite demo secrets changed during reconciliation'
+  printf 'deploy-test: idempotent HR Lite content reconciliation passed\n'
+}
+
+run_intranet_e2e() {
+  local port_mapping intranet_port intranet_base content_hash_before content_hash_after secrets_hash_before secrets_hash_after module_config
+  port_mapping=$(compose port app 80)
+  [[ "$port_mapping" =~ ^127\.0\.0\.1:[0-9]+$ ]] || die "Intranet test port is not loopback-only: $port_mapping"
+  intranet_port=${port_mapping##*:}
+  intranet_base="http://127.0.0.1:$intranet_port"
+  INTRANET_TEST_BASE=$intranet_base
+  module_config="$WORK_DIR/config/office-modules.env"
+  cp "$WORK_DIR/config/office-modules.env.example" "$module_config"
+  chmod 0600 "$module_config"
+  sed -i 's/^OFFICE_MODULE_INTRANET_LITE_ENABLED=.*/OFFICE_MODULE_INTRANET_LITE_ENABLED=true/' "$module_config"
+  export INTRANET_SECRETS_FILE="$WORK_DIR/.intranet-lite-demo.env"
+  NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" OFFICE_MODULE_CONFIG="$module_config" INTRANET_SECRETS_FILE="$INTRANET_SECRETS_FILE" \
+    "$WORK_DIR/scripts/intranet-lite-reconcile.sh" --reconcile --url "$intranet_base" --allow-test-http
+  content_hash_before=$(find "$WORK_DIR/intranet-lite" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+  secrets_hash_before=$(sha256sum "$INTRANET_SECRETS_FILE" | awk '{print $1}')
+  NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" OFFICE_MODULE_CONFIG="$module_config" INTRANET_SECRETS_FILE="$INTRANET_SECRETS_FILE" \
+    "$WORK_DIR/scripts/intranet-lite-reconcile.sh" --reconcile --url "$intranet_base" --allow-test-http
+  content_hash_after=$(find "$WORK_DIR/intranet-lite" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')
+  secrets_hash_after=$(sha256sum "$INTRANET_SECRETS_FILE" | awk '{print $1}')
+  [ "$content_hash_before" = "$content_hash_after" ] || die 'Intranet Lite target content changed during reconciliation'
+  [ "$secrets_hash_before" = "$secrets_hash_after" ] || die 'Intranet Lite demo secrets changed during reconciliation'
+  printf 'deploy-test: idempotent Intranet Lite content reconciliation, search API, and least-privilege checks passed\n'
+}
+
+prepare_talk_e2e() {
+  local port_mapping talk_port alice_password bob_password outsider_password
+  NEXTCLOUD_APP_CATALOG_FILE="$NEXTCLOUD_APP_CATALOG_FILE" "$WORK_DIR/scripts/reconcile-apps.sh" --module talk
+  port_mapping=$(compose port app 80)
+  [[ "$port_mapping" =~ ^127\.0\.0\.1:[0-9]+$ ]] || die "Talk test port is not loopback-only: $port_mapping"
+  talk_port=${port_mapping##*:}
+  TALK_TEST_BASE="http://127.0.0.1:$talk_port"
+  TALK_SECRETS_FILE="$WORK_DIR/.talk-demo.env"
+  alice_password=$(openssl rand -hex 32)
+  bob_password=$(openssl rand -hex 32)
+  outsider_password=$(openssl rand -hex 32)
+  umask 077
+  {
+    printf 'TALK_ALICE_PASSWORD=%s\n' "$alice_password"
+    printf 'TALK_BOB_PASSWORD=%s\n' "$bob_password"
+    printf 'TALK_OUTSIDER_PASSWORD=%s\n' "$outsider_password"
+  } >"$TALK_SECRETS_FILE"
+  occ group:add employee >/dev/null 2>&1 || true
+  for tuple in \
+    "talk-alice-demo|Talk Alice Demo|$alice_password" \
+    "talk-bob-demo|Talk Bob Demo|$bob_password" \
+    "talk-outsider-demo|Talk Outsider Demo|$outsider_password"; do
+    user=${tuple%%|*}
+    remainder=${tuple#*|}
+    display=${remainder%%|*}
+    password=${remainder#*|}
+    if ! occ user:info "$user" >/dev/null 2>&1; then
+      OC_PASS="$password" compose exec -T -u www-data -e OC_PASS app php occ user:add \
+        --password-from-env --display-name "$display" "$user" >/dev/null
+    fi
+  done
+  occ group:adduser employee talk-alice-demo >/dev/null
+  occ group:adduser employee talk-bob-demo >/dev/null
+  unset alice_password bob_password outsider_password password
+}
+
+run_talk_e2e() {
+  local alice_password bob_password outsider_password alice_netrc bob_netrc outsider_netrc room token participant message messages outsider_status state
+  alice_password=$(awk -F= '$1 == "TALK_ALICE_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$TALK_SECRETS_FILE")
+  bob_password=$(awk -F= '$1 == "TALK_BOB_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$TALK_SECRETS_FILE")
+  outsider_password=$(awk -F= '$1 == "TALK_OUTSIDER_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$TALK_SECRETS_FILE")
+  alice_netrc=$(mktemp)
+  bob_netrc=$(mktemp)
+  outsider_netrc=$(mktemp)
+  trap 'rm -f -- "$alice_netrc" "$bob_netrc" "$outsider_netrc"' RETURN
+  chmod 600 "$alice_netrc" "$bob_netrc" "$outsider_netrc"
+  printf 'machine %s login talk-alice-demo password %s\n' "${TALK_TEST_BASE#*://}" "$alice_password" >"$alice_netrc"
+  printf 'machine %s login talk-bob-demo password %s\n' "${TALK_TEST_BASE#*://}" "$bob_password" >"$bob_netrc"
+  printf 'machine %s login talk-outsider-demo password %s\n' "${TALK_TEST_BASE#*://}" "$outsider_password" >"$outsider_netrc"
+  unset alice_password bob_password outsider_password
+
+  room=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
+    -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
+    --data 'roomType=2' --data-urlencode 'roomName=Essentials+ Office synthetic room' \
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room?format=json")
+  token=$(jq -r '.ocs.data.token // empty' <<<"$room")
+  [[ "$token" =~ ^[a-z0-9]{4,64}$ ]] || die 'Talk room API did not return a valid token'
+  participant=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
+    -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
+    --data 'source=users' --data 'newParticipant=talk-bob-demo' \
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room/$token/participants?format=json")
+  jq -e '.ocs.meta.statuscode == 100' <<<"$participant" >/dev/null || die 'Talk participant invitation failed'
+  message=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
+    -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
+    --data-urlencode 'message=Essentials+ Office synthetic Talk message' \
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json")
+  jq -e '.ocs.meta.statuscode == 100 and (.ocs.data.id | tonumber) > 0' <<<"$message" >/dev/null || die 'Talk message send failed'
+  messages=$(curl --fail --silent --show-error --netrc-file "$bob_netrc" \
+    -H 'OCS-APIRequest: true' -H 'Accept: application/json' \
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100")
+  jq -e '[.ocs.data[]? | select(.message == "Essentials+ Office synthetic Talk message")] | length == 1' <<<"$messages" >/dev/null ||
+    die 'invited Talk participant did not receive the synthetic message'
+  outsider_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$outsider_netrc" \
+    -H 'OCS-APIRequest: true' "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json")
+  case "$outsider_status" in 403|404) ;; *) die "Talk outsider unexpectedly reached the room (HTTP $outsider_status)" ;; esac
+
+  occ essentialsplus:module:disable talk >/dev/null
+  state=$(occ essentialsplus:module:status talk)
+  jq -e '.state == "disabled" and .active == false' <<<"$state" >/dev/null || die 'Talk logical disable failed'
+  state=$(occ essentialsplus:module:enable talk)
+  jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Talk reactivation failed'
+  messages=$(curl --fail --silent --show-error --netrc-file "$bob_netrc" \
+    -H 'OCS-APIRequest: true' -H 'Accept: application/json' \
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100")
+  jq -e '[.ocs.data[]? | select(.message == "Essentials+ Office synthetic Talk message")] | length == 1' <<<"$messages" >/dev/null ||
+    die 'Talk room data was not preserved across logical disable'
+  rm -f -- "$alice_netrc" "$bob_netrc" "$outsider_netrc"
+  trap - RETURN
+  printf 'deploy-test: Talk room, participant, message, permission, state, and data-preservation flow passed\n'
+}
+
+assert_hr_data_present() {
+  local password netrc status
+  password=$(awk -F= '$1 == "HR_LITE_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$HR_LITE_SECRETS_FILE")
+  netrc=$(mktemp)
+  chmod 600 "$netrc"
+  printf 'machine %s login hr-demo-admin password %s\n' "${HR_TEST_BASE#*://}" "$password" >"$netrc"
+  unset password
+  status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$netrc" --request HEAD \
+    "$HR_TEST_BASE/remote.php/dav/files/hr-demo-admin/HR%20Lite%20-%20Confidential/workflow-target.json")
+  rm -f -- "$netrc"
+  [ "$status" = 200 ] || die "HR Lite data was not preserved during logical disable (HTTP $status)"
+}
+
+assert_intranet_data_present() {
+  local password netrc status
+  password=$(awk -F= '$1 == "INTRANET_EDITOR_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$INTRANET_SECRETS_FILE")
+  netrc=$(mktemp)
+  chmod 600 "$netrc"
+  printf 'machine %s login intranet-editor-demo password %s\n' "${INTRANET_TEST_BASE#*://}" "$password" >"$netrc"
+  unset password
+  status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$netrc" --request HEAD \
+    "$INTRANET_TEST_BASE/remote.php/dav/files/intranet-editor-demo/Intranet%20Lite/handbook.md")
+  rm -f -- "$netrc"
+  [ "$status" = 200 ] || die "Intranet Lite data was not preserved during logical disable (HTTP $status)"
+}
+
+run_module_control_tests() {
+  local state enabled_groups failure_output
+  state=$(occ essentialsplus:module:status nextcloud-core)
+  jq -e '.id == "nextcloud-core" and .state == "enabled" and .active == true' <<<"$state" >/dev/null ||
+    die 'required core module is not healthy and enabled'
+
+  failure_output="$WORK_DIR/external-enable.failure"
+  if occ essentialsplus:module:enable vaultwarden >"$failure_output" 2>&1; then
+    die 'unconfigured Vaultwarden was unexpectedly enabled'
+  fi
+  state=$(occ essentialsplus:module:status vaultwarden)
+  jq -e '.state == "not_installed" and .active == false' <<<"$state" >/dev/null ||
+    die 'uninstalled Vaultwarden did not remain inactive'
+  if occ essentialsplus:module:configure vaultwarden password synthetic-secret >"$failure_output" 2>&1; then
+    die 'Admin Center accepted a secret-like configuration key'
+  fi
+  ! rg -q 'synthetic-secret' "$failure_output" || die 'rejected secret value appeared in command output'
+  occ essentialsplus:module:disable vaultwarden >/dev/null
+
+  for pair in \
+    'installed:true' \
+    'serviceUrl:https://calls-unreachable.internal' \
+    'healthUrl:https://calls-unreachable.internal/health' \
+    'authenticationReady:true' \
+    'rolesReady:true' \
+    'sipCredentialStorageReady:true' \
+    'rightsReady:true'; do
+    occ essentialsplus:module:configure essentials-calls "${pair%%:*}" "${pair#*:}" >/dev/null
+  done
+  if occ essentialsplus:module:enable essentials-calls >"$failure_output" 2>&1; then
+    die 'unhealthy Essentials+ Calls service was unexpectedly enabled'
+  fi
+  state=$(occ essentialsplus:module:status essentials-calls)
+  jq -e '.state == "degraded" and .desired == true and .active == false and .serviceUrl == null' <<<"$state" >/dev/null ||
+    die 'failed external healthcheck did not produce hidden degraded state'
+  occ essentialsplus:module:disable essentials-calls >/dev/null
+
+  if [ "$WITH_INTRANET" = true ]; then
+    state=$(occ essentialsplus:module:enable intranet-lite)
+    jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Intranet Lite activation failed'
+    BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,intranet-lite"
+  fi
+  if [ "$WITH_HR" = true ]; then
+    occ essentialsplus:module:configure hr-lite workflowReady true >/dev/null
+    state=$(occ essentialsplus:module:enable hr-lite)
+    jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'HR Lite activation failed'
+    BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,hr-lite"
+  fi
+  if [ "$WITH_TALK" = true ]; then
+    state=$(occ essentialsplus:module:enable talk)
+    jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Talk activation failed'
+    BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,talk"
+  fi
+
+  if [ "$WITH_HR" = true ] && [ "$WITH_INTRANET" = true ]; then
+    enabled_groups=$(occ config:app:get forms enabled)
+    jq -e 'sort == ["employee", "hr-admin", "intranet-editor", "manager"]' <<<"$enabled_groups" >/dev/null ||
+      die 'shared app group visibility is not the union of active modules'
+  fi
+
+  if [ "$WITH_HR" = true ]; then
+    occ essentialsplus:module:disable hr-lite >/dev/null
+    assert_hr_data_present
+    state=$(occ essentialsplus:module:status hr-lite)
+    jq -e '.state == "disabled" and .active == false' <<<"$state" >/dev/null || die 'HR Lite logical disable failed'
+    state=$(occ essentialsplus:module:enable hr-lite)
+    jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'HR Lite reactivation failed'
+    NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" HR_LITE_SECRETS_FILE="$HR_LITE_SECRETS_FILE" \
+      "$WORK_DIR/scripts/hr-lite-verify.sh" --url "$HR_TEST_BASE" --allow-test-http
+  fi
+  if [ "$WITH_INTRANET" = true ]; then
+    occ essentialsplus:module:disable intranet-lite >/dev/null
+    assert_intranet_data_present
+    state=$(occ essentialsplus:module:status intranet-lite)
+    jq -e '.state == "disabled" and .active == false' <<<"$state" >/dev/null || die 'Intranet Lite logical disable failed'
+    state=$(occ essentialsplus:module:enable intranet-lite)
+    jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Intranet Lite reactivation failed'
+    NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" OFFICE_MODULE_CONFIG="$WORK_DIR/config/office-modules.env" \
+      INTRANET_SECRETS_FILE="$INTRANET_SECRETS_FILE" "$WORK_DIR/scripts/intranet-lite-reconcile.sh" \
+      --verify --url "$INTRANET_TEST_BASE" --allow-test-http
+  fi
+  occ essentialsplus:metrics | rg -q '^essentialsplus_module_state\{module="nextcloud-core",state="enabled"\} 1$' ||
+    die 'Prometheus module metrics are missing the healthy core state'
+  printf 'deploy-test: OCC/API control, health gates, shared visibility, disable preservation, and metrics passed\n'
+}
+
+run_app_failure_mode_tests() {
+  local incompatible_catalog missing_catalog failure_log
+  incompatible_catalog="$WORK_DIR/app-catalog-incompatible.json"
+  missing_catalog="$WORK_DIR/app-catalog-missing.json"
+  failure_log="$WORK_DIR/app-preflight.failure"
+  jq 'map(if .id == "notes" then .releases[0].version = "99.0.0" else . end)' \
+    "$NEXTCLOUD_APP_CATALOG_FILE" >"$incompatible_catalog"
+  if NEXTCLOUD_APP_CATALOG_FILE="$incompatible_catalog" "$WORK_DIR/scripts/reconcile-apps.sh" --check >"$failure_log" 2>&1; then
+    die 'incompatible app release was unexpectedly accepted'
+  fi
+  rg -q 'outside manifest range for notes' "$failure_log" || die 'incompatible app failure was not explicit'
+  jq 'map(select(.id != "notes"))' "$NEXTCLOUD_APP_CATALOG_FILE" >"$missing_catalog"
+  if NEXTCLOUD_APP_CATALOG_FILE="$missing_catalog" "$WORK_DIR/scripts/reconcile-apps.sh" --check >"$failure_log" 2>&1; then
+    die 'missing App Store package was unexpectedly accepted'
+  fi
+  rg -q 'no App Store release of notes is compatible' "$failure_log" || die 'missing app failure was not explicit'
+  printf 'deploy-test: incompatible and missing app preflights failed closed\n'
 }
 
 deploy_args=()
@@ -210,6 +552,20 @@ fi
 "$WORK_DIR/scripts/deploy.sh" "${deploy_args[@]}"
 
 webdav_prepare
+run_app_failure_mode_tests
+if [ "$WITH_HR" = true ]; then
+  run_hr_e2e
+fi
+if [ "$WITH_INTRANET" = true ]; then
+  run_intranet_e2e
+fi
+if [ "$WITH_TALK" = true ]; then
+  prepare_talk_e2e
+fi
+run_module_control_tests
+if [ "$WITH_TALK" = true ]; then
+  run_talk_e2e
+fi
 if [ "$WITH_BROWSER" = true ]; then
   run_browser_e2e
 fi
@@ -239,6 +595,9 @@ occ app:list --output=json \
 cmp -- "$WORK_DIR/module-state.before.json" "$WORK_DIR/module-state.after.json" || die 'module state is not semantically idempotent'
 cmp -- "$WORK_DIR/app-state.before.json" "$WORK_DIR/app-state.after.json" || die 'declared app state is not semantically idempotent'
 webdav_verify_and_remove
+if [ "$WITH_RECOVERY" = true ]; then
+  run_recovery_e2e
+fi
 
 printf 'deploy-test: clean deploy, WebDAV restart persistence, semantic idempotence, and browser=%s passed (apps=%s)\n' \
   "$WITH_BROWSER" "$WITH_APPS"

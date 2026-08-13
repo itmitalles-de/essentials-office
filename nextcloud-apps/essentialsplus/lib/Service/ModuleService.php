@@ -154,6 +154,13 @@ final class ModuleService {
             return $this->status($id);
         } catch (Throwable $exception) {
             $this->stateStore->setActive($id, false);
+            if ($module['required'] !== true) {
+                try {
+                    $this->removeModuleAppEntitlements($module);
+                } catch (Throwable) {
+                    // Logical activation remains false even if app entitlement rollback needs repair.
+                }
+            }
             $this->auditService->record($actor, $id, 'enable', 'failed', ['reason' => $this->safeReason($exception)]);
             throw $exception;
         }
@@ -166,14 +173,9 @@ final class ModuleService {
             throw new RuntimeException('Required module cannot be disabled: ' . $id);
         }
         $this->stateStore->setActive($id, false);
+        $this->stateStore->setDesired($id, false);
         try {
-            foreach ($module['nextcloudApps'] as $app) {
-                if (!$this->appRequiredByAnotherActiveModule($app['id'], $id)
-                    && $this->appManager->isEnabledForAnyone($app['id'])) {
-                    $this->appManager->disableApp($app['id']);
-                }
-            }
-            $this->stateStore->setDesired($id, false);
+            $this->removeModuleAppEntitlements($module);
             $this->auditService->record($actor, $id, 'disable', 'success', ['dataDeleted' => false, 'serviceStopped' => false]);
             return $this->status($id);
         } catch (Throwable $exception) {
@@ -185,11 +187,31 @@ final class ModuleService {
     /** @return array<string, mixed> */
     public function doctor(string $id, string $actor = 'system'): array {
         $module = $this->manifests->module($id);
-        $health = $this->healthService->check($module);
-        $active = $this->stateStore->desired($module) && $health['ok'];
-        $this->stateStore->setActive($id, $active);
-        $this->auditService->record($actor, $id, 'doctor', $health['ok'] ? 'success' : 'failed');
-        return $this->status($id);
+        try {
+            $readiness = $this->healthService->readiness($module);
+            if ($this->stateStore->desired($module) && $readiness['installed'] && $readiness['configurationReady']) {
+                $this->applyAppVisibility($module);
+            }
+            $health = $this->healthService->check($module);
+            $active = $this->stateStore->desired($module) && $health['ok'];
+            $this->stateStore->setActive($id, $active);
+            if (!$active && $module['required'] !== true) {
+                $this->removeModuleAppEntitlements($module);
+            }
+            $this->auditService->record($actor, $id, 'doctor', $health['ok'] ? 'success' : 'failed');
+            return $this->status($id);
+        } catch (Throwable $exception) {
+            $this->stateStore->setActive($id, false);
+            if ($module['required'] !== true) {
+                try {
+                    $this->removeModuleAppEntitlements($module);
+                } catch (Throwable) {
+                    // Keep the module hidden; doctor reports the original failure.
+                }
+            }
+            $this->auditService->record($actor, $id, 'doctor', 'failed', ['reason' => $this->safeReason($exception)]);
+            throw $exception;
+        }
     }
 
     /** @param list<string> $groups
@@ -242,6 +264,9 @@ final class ModuleService {
             $this->stateStore->setConfiguration($id, $key, $normalized);
         }
         $this->stateStore->setActive($id, false);
+        if ($module['required'] !== true) {
+            $this->removeModuleAppEntitlements($module);
+        }
         $this->auditService->record($actor, $id, 'configure', 'success', ['key' => $key]);
         return $this->status($id);
     }
@@ -253,30 +278,61 @@ final class ModuleService {
 
     /** @param array<string, mixed> $module */
     private function applyAppVisibility(array $module): void {
-        $visibility = $this->visibility($module);
-        $allAuthenticated = in_array('all-authenticated', $visibility, true);
-        $groups = [];
-        foreach ($visibility as $groupId) {
-            if ($groupId === 'all-authenticated') {
-                continue;
-            }
-            $group = $this->groupManager->get($groupId);
-            if ($group === null && $module['groups']['autoCreate'] === true) {
-                $group = $this->groupManager->createGroup($groupId);
-            }
-            if ($group === null) {
-                throw new RuntimeException('Required visibility group is missing: ' . $groupId);
-            }
-            $groups[] = $group;
-        }
         foreach ($module['nextcloudApps'] as $app) {
             if ($this->appManager->getAppInfo($app['id']) === null) {
                 throw new RuntimeException('Nextcloud app package is missing: ' . $app['id']);
             }
-            if ($allAuthenticated) {
-                $this->appManager->enableApp($app['id']);
-            } else {
-                $this->appManager->enableAppForGroups($app['id'], $groups);
+            $this->applyAppVisibilityForApp($app['id'], $module);
+        }
+    }
+
+    /** @param array<string, mixed>|null $includingModule */
+    private function applyAppVisibilityForApp(string $appId, ?array $includingModule): void {
+        $groupIds = [];
+        $allAuthenticated = false;
+        foreach ($this->manifests->modules() as $candidate) {
+            $includedExplicitly = $includingModule !== null && $candidate['id'] === $includingModule['id'];
+            if (!$includedExplicitly
+                && $candidate['required'] !== true
+                && !$this->stateStore->active($candidate['id'])) {
+                continue;
+            }
+            if (!$this->moduleDeclaresApp($candidate, $appId)) {
+                continue;
+            }
+            foreach ($this->visibility($candidate) as $groupId) {
+                if ($groupId === 'all-authenticated') {
+                    $allAuthenticated = true;
+                    continue;
+                }
+                $group = $this->groupManager->get($groupId);
+                if ($group === null && $candidate['groups']['autoCreate'] === true) {
+                    $group = $this->groupManager->createGroup($groupId);
+                }
+                if ($group === null) {
+                    throw new RuntimeException('Required visibility group is missing: ' . $groupId);
+                }
+                $groupIds[$groupId] = $group;
+            }
+        }
+        if ($allAuthenticated) {
+            $this->appManager->enableApp($appId);
+            return;
+        }
+        if ($groupIds === []) {
+            throw new RuntimeException('No active module entitlement exists for app: ' . $appId);
+        }
+        ksort($groupIds);
+        $this->appManager->enableAppForGroups($appId, array_values($groupIds));
+    }
+
+    /** @param array<string, mixed> $module */
+    private function removeModuleAppEntitlements(array $module): void {
+        foreach ($module['nextcloudApps'] as $app) {
+            if ($this->appRequiredByAnotherActiveModule($app['id'], $module['id'])) {
+                $this->applyAppVisibilityForApp($app['id'], null);
+            } elseif ($this->appManager->isEnabledForAnyone($app['id'])) {
+                $this->appManager->disableApp($app['id']);
             }
         }
     }
@@ -300,6 +356,16 @@ final class ModuleService {
                 if ($app['id'] === $appId) {
                     return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    /** @param array<string, mixed> $module */
+    private function moduleDeclaresApp(array $module, string $appId): bool {
+        foreach ($module['nextcloudApps'] as $app) {
+            if ($app['id'] === $appId) {
+                return true;
             }
         }
         return false;

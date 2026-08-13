@@ -36,7 +36,7 @@ container_id=$(compose ps -q vaultwarden)
 [ -n "$container_id" ] || die 'Vaultwarden container ID is unavailable'
 health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
 [ "$health" = healthy ] || die "Vaultwarden container health is $health"
-if docker port "$container_id" 8080 | grep -q .; then
+if docker port "$container_id" 8080 2>/dev/null | grep -q .; then
   die 'Vaultwarden must not publish a host port'
 fi
 compose exec -T vaultwarden /healthcheck.sh >/dev/null || die 'Vaultwarden internal health check failed'

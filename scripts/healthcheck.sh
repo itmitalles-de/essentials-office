@@ -99,7 +99,8 @@ done
 docker compose ps
 
 docker compose exec -T db sh -ec 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null || die 'PostgreSQL is not ready'
-docker compose exec -T redis sh -ec 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping | grep -qx PONG' || die 'Redis did not answer PONG'
+docker compose exec -T redis sh -ec 'REDISCLI_AUTH="$REDIS_PASSWORD" exec redis-cli --no-auth-warning ping' | grep -qx PONG ||
+  die 'Redis did not answer PONG'
 
 occ_status=$(docker compose exec -T -u www-data app php occ status --output=json)
 printf '%s\n' "$occ_status" | grep -Eq '"installed"[[:space:]]*:[[:space:]]*true' || die 'Nextcloud is not installed'
