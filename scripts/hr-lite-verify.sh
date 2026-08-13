@@ -75,6 +75,7 @@ if [ -n "$BASE_URL" ]; then
   admin_password=$(secret_value HR_LITE_ADMIN_PASSWORD)
   manager_password=$(secret_value HR_LITE_MANAGER_PASSWORD)
   url_host=${BASE_URL#*://}
+  url_host=${url_host%%:*}
   admin_netrc=$(mktemp)
   manager_netrc=$(mktemp)
   employee_netrc=
@@ -100,7 +101,7 @@ if [ -n "$BASE_URL" ]; then
   case "$employee_status" in 403|404) ;; *) die "employee unexpectedly reached protected folder (HTTP $employee_status)" ;; esac
   for fixture in employee-directory.csv absence-requests.csv responsibilities.csv workflow-target.json; do
     status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-      --netrc-file "$admin_netrc" --request HEAD "$folder_url/$fixture")
+      --netrc-file "$admin_netrc" --head "$folder_url/$fixture")
     [ "$status" = 200 ] || die "synthetic HR workflow fixture is missing: $fixture (HTTP $status)"
   done
 fi

@@ -32,6 +32,12 @@ set_env_value() {
   sed -i "s|^${key}=.*|${key}=${value}|" "$WORK_DIR/.env"
 }
 
+netrc_machine() {
+  local endpoint=$1 host
+  host=${endpoint#*://}
+  printf '%s\n' "${host%%:*}"
+}
+
 cleanup() {
   local status=$?
   if [ -n "$CHROMEDRIVER_PID" ]; then
@@ -360,7 +366,7 @@ prepare_talk_e2e() {
 }
 
 run_talk_e2e() {
-  local alice_password bob_password outsider_password alice_netrc bob_netrc outsider_netrc room token participant message messages outsider_status state
+  local alice_password bob_password outsider_password alice_netrc bob_netrc outsider_netrc talk_host room token participant message messages outsider_status state
   alice_password=$(awk -F= '$1 == "TALK_ALICE_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$TALK_SECRETS_FILE")
   bob_password=$(awk -F= '$1 == "TALK_BOB_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$TALK_SECRETS_FILE")
   outsider_password=$(awk -F= '$1 == "TALK_OUTSIDER_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$TALK_SECRETS_FILE")
@@ -369,9 +375,10 @@ run_talk_e2e() {
   outsider_netrc=$(mktemp)
   trap 'rm -f -- "$alice_netrc" "$bob_netrc" "$outsider_netrc"' RETURN
   chmod 600 "$alice_netrc" "$bob_netrc" "$outsider_netrc"
-  printf 'machine %s login talk-alice-demo password %s\n' "${TALK_TEST_BASE#*://}" "$alice_password" >"$alice_netrc"
-  printf 'machine %s login talk-bob-demo password %s\n' "${TALK_TEST_BASE#*://}" "$bob_password" >"$bob_netrc"
-  printf 'machine %s login talk-outsider-demo password %s\n' "${TALK_TEST_BASE#*://}" "$outsider_password" >"$outsider_netrc"
+  talk_host=$(netrc_machine "$TALK_TEST_BASE")
+  printf 'machine %s login talk-alice-demo password %s\n' "$talk_host" "$alice_password" >"$alice_netrc"
+  printf 'machine %s login talk-bob-demo password %s\n' "$talk_host" "$bob_password" >"$bob_netrc"
+  printf 'machine %s login talk-outsider-demo password %s\n' "$talk_host" "$outsider_password" >"$outsider_netrc"
   unset alice_password bob_password outsider_password
 
   room=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
@@ -415,26 +422,28 @@ run_talk_e2e() {
 }
 
 assert_hr_data_present() {
-  local password netrc status
+  local password netrc status hr_host
   password=$(awk -F= '$1 == "HR_LITE_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$HR_LITE_SECRETS_FILE")
   netrc=$(mktemp)
   chmod 600 "$netrc"
-  printf 'machine %s login hr-demo-admin password %s\n' "${HR_TEST_BASE#*://}" "$password" >"$netrc"
+  hr_host=$(netrc_machine "$HR_TEST_BASE")
+  printf 'machine %s login hr-demo-admin password %s\n' "$hr_host" "$password" >"$netrc"
   unset password
-  status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$netrc" --request HEAD \
+  status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$netrc" --head \
     "$HR_TEST_BASE/remote.php/dav/files/hr-demo-admin/HR%20Lite%20-%20Confidential/workflow-target.json")
   rm -f -- "$netrc"
   [ "$status" = 200 ] || die "HR Lite data was not preserved during logical disable (HTTP $status)"
 }
 
 assert_intranet_data_present() {
-  local password netrc status
+  local password netrc status intranet_host
   password=$(awk -F= '$1 == "INTRANET_EDITOR_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' "$INTRANET_SECRETS_FILE")
   netrc=$(mktemp)
   chmod 600 "$netrc"
-  printf 'machine %s login intranet-editor-demo password %s\n' "${INTRANET_TEST_BASE#*://}" "$password" >"$netrc"
+  intranet_host=$(netrc_machine "$INTRANET_TEST_BASE")
+  printf 'machine %s login intranet-editor-demo password %s\n' "$intranet_host" "$password" >"$netrc"
   unset password
-  status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$netrc" --request HEAD \
+  status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$netrc" --head \
     "$INTRANET_TEST_BASE/remote.php/dav/files/intranet-editor-demo/Intranet%20Lite/handbook.md")
   rm -f -- "$netrc"
   [ "$status" = 200 ] || die "Intranet Lite data was not preserved during logical disable (HTTP $status)"
@@ -442,7 +451,8 @@ assert_intranet_data_present() {
 
 run_module_control_tests() {
   local state enabled_groups failure_output
-  state=$(occ essentialsplus:module:status nextcloud-core)
+  printf 'deploy-test: starting OCC module control and health-gate checks\n'
+  state=$(occ essentialsplus:module:status nextcloud-core) || die 'core module status command failed'
   jq -e '.id == "nextcloud-core" and .state == "enabled" and .active == true' <<<"$state" >/dev/null ||
     die 'required core module is not healthy and enabled'
 
@@ -450,14 +460,14 @@ run_module_control_tests() {
   if occ essentialsplus:module:enable vaultwarden >"$failure_output" 2>&1; then
     die 'unconfigured Vaultwarden was unexpectedly enabled'
   fi
-  state=$(occ essentialsplus:module:status vaultwarden)
+  state=$(occ essentialsplus:module:status vaultwarden) || die 'Vaultwarden module status command failed'
   jq -e '.state == "not_installed" and .active == false' <<<"$state" >/dev/null ||
     die 'uninstalled Vaultwarden did not remain inactive'
   if occ essentialsplus:module:configure vaultwarden password synthetic-secret >"$failure_output" 2>&1; then
     die 'Admin Center accepted a secret-like configuration key'
   fi
   ! rg -q 'synthetic-secret' "$failure_output" || die 'rejected secret value appeared in command output'
-  occ essentialsplus:module:disable vaultwarden >/dev/null
+  occ essentialsplus:module:disable vaultwarden >/dev/null || die 'Vaultwarden logical disable command failed'
 
   for pair in \
     'installed:true' \
@@ -467,55 +477,56 @@ run_module_control_tests() {
     'rolesReady:true' \
     'sipCredentialStorageReady:true' \
     'rightsReady:true'; do
-    occ essentialsplus:module:configure essentials-calls "${pair%%:*}" "${pair#*:}" >/dev/null
+    occ essentialsplus:module:configure essentials-calls "${pair%%:*}" "${pair#*:}" >/dev/null ||
+      die "Essentials+ Calls configuration failed for ${pair%%:*}"
   done
   if occ essentialsplus:module:enable essentials-calls >"$failure_output" 2>&1; then
     die 'unhealthy Essentials+ Calls service was unexpectedly enabled'
   fi
-  state=$(occ essentialsplus:module:status essentials-calls)
+  state=$(occ essentialsplus:module:status essentials-calls) || die 'Essentials+ Calls status command failed'
   jq -e '.state == "degraded" and .desired == true and .active == false and .serviceUrl == null' <<<"$state" >/dev/null ||
     die 'failed external healthcheck did not produce hidden degraded state'
-  occ essentialsplus:module:disable essentials-calls >/dev/null
+  occ essentialsplus:module:disable essentials-calls >/dev/null || die 'Essentials+ Calls logical disable command failed'
 
   if [ "$WITH_INTRANET" = true ]; then
-    state=$(occ essentialsplus:module:enable intranet-lite)
+    state=$(occ essentialsplus:module:enable intranet-lite) || die 'Intranet Lite enable command failed'
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Intranet Lite activation failed'
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,intranet-lite"
   fi
   if [ "$WITH_HR" = true ]; then
-    occ essentialsplus:module:configure hr-lite workflowReady true >/dev/null
-    state=$(occ essentialsplus:module:enable hr-lite)
+    occ essentialsplus:module:configure hr-lite workflowReady true >/dev/null || die 'HR Lite readiness configuration failed'
+    state=$(occ essentialsplus:module:enable hr-lite) || die 'HR Lite enable command failed'
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'HR Lite activation failed'
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,hr-lite"
   fi
   if [ "$WITH_TALK" = true ]; then
-    state=$(occ essentialsplus:module:enable talk)
+    state=$(occ essentialsplus:module:enable talk) || die 'Talk enable command failed'
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Talk activation failed'
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,talk"
   fi
 
   if [ "$WITH_HR" = true ] && [ "$WITH_INTRANET" = true ]; then
-    enabled_groups=$(occ config:app:get forms enabled)
+    enabled_groups=$(occ config:app:get forms enabled) || die 'shared Forms visibility query failed'
     jq -e 'sort == ["employee", "hr-admin", "intranet-editor", "manager"]' <<<"$enabled_groups" >/dev/null ||
       die 'shared app group visibility is not the union of active modules'
   fi
 
   if [ "$WITH_HR" = true ]; then
-    occ essentialsplus:module:disable hr-lite >/dev/null
+    occ essentialsplus:module:disable hr-lite >/dev/null || die 'HR Lite disable command failed'
     assert_hr_data_present
-    state=$(occ essentialsplus:module:status hr-lite)
+    state=$(occ essentialsplus:module:status hr-lite) || die 'HR Lite disabled status command failed'
     jq -e '.state == "disabled" and .active == false' <<<"$state" >/dev/null || die 'HR Lite logical disable failed'
-    state=$(occ essentialsplus:module:enable hr-lite)
+    state=$(occ essentialsplus:module:enable hr-lite) || die 'HR Lite re-enable command failed'
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'HR Lite reactivation failed'
     NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" HR_LITE_SECRETS_FILE="$HR_LITE_SECRETS_FILE" \
       "$WORK_DIR/scripts/hr-lite-verify.sh" --url "$HR_TEST_BASE" --allow-test-http
   fi
   if [ "$WITH_INTRANET" = true ]; then
-    occ essentialsplus:module:disable intranet-lite >/dev/null
+    occ essentialsplus:module:disable intranet-lite >/dev/null || die 'Intranet Lite disable command failed'
     assert_intranet_data_present
-    state=$(occ essentialsplus:module:status intranet-lite)
+    state=$(occ essentialsplus:module:status intranet-lite) || die 'Intranet Lite disabled status command failed'
     jq -e '.state == "disabled" and .active == false' <<<"$state" >/dev/null || die 'Intranet Lite logical disable failed'
-    state=$(occ essentialsplus:module:enable intranet-lite)
+    state=$(occ essentialsplus:module:enable intranet-lite) || die 'Intranet Lite re-enable command failed'
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Intranet Lite reactivation failed'
     NEXTCLOUD_ENV_FILE="$WORK_DIR/.env" OFFICE_MODULE_CONFIG="$WORK_DIR/config/office-modules.env" \
       INTRANET_SECRETS_FILE="$INTRANET_SECRETS_FILE" "$WORK_DIR/scripts/intranet-lite-reconcile.sh" \

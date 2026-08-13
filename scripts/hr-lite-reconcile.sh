@@ -156,6 +156,7 @@ netrc=$(mktemp)
 trap 'rm -f -- "$netrc"' EXIT INT TERM
 chmod 600 "$netrc"
 url_host=${BASE_URL#*://}
+url_host=${url_host%%:*}
 printf 'machine %s login %s password %s\n' "$url_host" hr-demo-admin "$hr_admin_password" >"$netrc"
 unset hr_admin_password manager_password employee_password
 

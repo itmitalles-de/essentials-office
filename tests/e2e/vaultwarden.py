@@ -109,7 +109,11 @@ class Driver:
         element = self.element_from_script(
             """
             const wanted = arguments[0].trim().toLowerCase();
-            const nodes = Array.from(document.querySelectorAll('button,a,[role="button"],[role="link"],[role="menuitem"],[role="tab"]'));
+            const nodes = Array.from(document.querySelectorAll('button,a,[role="button"],[role="link"],[role="menuitem"],[role="tab"]'))
+                .filter((node) => node.getClientRects().length > 0
+                    && getComputedStyle(node).visibility !== 'hidden'
+                    && !node.disabled
+                    && node.getAttribute('aria-disabled') !== 'true');
             return nodes.find((node) => (node.innerText || node.textContent || '').trim().toLowerCase() === wanted)
                 || nodes.find((node) => (node.innerText || node.textContent || '').trim().toLowerCase().includes(wanted))
                 || null;
@@ -119,13 +123,14 @@ class Driver:
         self.request("POST", f"/session/{self.session_id}/element/{element}/click", {})
 
     def click_first(self, *values: str) -> None:
+        errors: list[str] = []
         for value in values:
             try:
                 self.click_text(value)
                 return
-            except RuntimeError:
-                pass
-        fail(f"browser element not found: {' / '.join(values)}")
+            except RuntimeError as exception:
+                errors.append(str(exception))
+        fail(f"browser action failed: {' / '.join(values)}; attempts: {errors!r}")
 
     def fill_label(self, value: str, content: str) -> None:
         element = self.element_from_script(
@@ -145,7 +150,13 @@ class Driver:
                     || label.parentElement?.parentElement?.querySelector('input,textarea');
                 if (local) return local;
             }
-            return null;
+            const normalized = wanted.replace(/[^a-z0-9]+/g, '');
+            return Array.from(document.querySelectorAll('input,textarea')).find((node) => {
+                if (node.getClientRects().length === 0 || node.disabled) return false;
+                const semantics = [node.id, node.name, node.placeholder, node.getAttribute('autocomplete')]
+                    .filter(Boolean).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
+                return semantics.includes(normalized);
+            }) || null;
             """,
             value,
         )
@@ -198,11 +209,15 @@ def wait_for(predicate, message: str, timeout: int = 45) -> None:
 
 
 def dismiss_extension(driver: Driver) -> None:
-    try:
-        driver.click_text("Add it later")
-        driver.click_text("Skip to web app")
-    except RuntimeError:
-        pass
+    for action in ("Add it later", "Skip to web app"):
+        try:
+            def click_action() -> bool:
+                driver.click_text(action)
+                return True
+
+            wait_for(click_action, f"optional extension action did not appear: {action}", 8)
+        except RuntimeError:
+            pass
 
 
 def create_account(endpoint: str, chromium: str, base: str, email: str, name: str, password: str) -> None:
@@ -318,19 +333,44 @@ def login(driver: Driver, base: str, email: str, password: str) -> None:
         60,
     )
     dismiss_extension(driver)
-    wait_for(
-        lambda: bool(
-            driver.execute(
-                "return location.hash.includes('/vault') || "
-                "(document.body?.innerText || '').toLowerCase().includes('all vaults')"
-            )
-        ),
-        "Vaultwarden login extension prompt did not lead to the vault",
-        30,
-    )
+    try:
+        wait_for(
+            lambda: bool(
+                driver.execute(
+                    "return location.hash.includes('/vault') || "
+                    "(document.body?.innerText || '').toLowerCase().includes('all vaults')"
+                )
+            ),
+            "Vaultwarden login extension prompt did not lead to the vault",
+            30,
+        )
+    except RuntimeError as exception:
+        safe_body = driver.body_text().replace(email, "[synthetic-email]")[:1200]
+        state = driver.execute(
+            """
+            return {
+              url: location.href,
+              actions: Array.from(document.querySelectorAll('button,a,[role="button"],[role="link"]'))
+                .map((node) => (node.innerText || node.textContent || '').trim()).filter(Boolean).slice(0, 80),
+            };
+            """
+        )
+        fail(
+            f"{exception}; login UI text: {safe_body!r}; state: {state!r}; "
+            f"browser log: {driver.browser_log()!r}"
+        )
 
 
 def create_organization_objects(driver: Driver, member_email: str) -> None:
+    try:
+        driver.click_text("Skip")
+        wait_for(
+            lambda: "you're in! welcome to bitwarden" not in driver.body_text().lower(),
+            "Vaultwarden onboarding tour did not close",
+            10,
+        )
+    except RuntimeError:
+        pass
     driver.click_first("New organization", "New organisation")
     wait_for(
         lambda: any(value in driver.body_text().lower() for value in ("organization name", "organisation name")),
@@ -345,6 +385,11 @@ def create_organization_objects(driver: Driver, member_email: str) -> None:
         lambda: "essentials plus synthetic org" in driver.body_text().lower(),
         "organization was not created",
     )
+    wait_for(
+        lambda: "organization created" not in driver.body_text().lower(),
+        "organization success notification did not clear",
+        20,
+    )
 
     driver.click_text("Collections")
     wait_for(lambda: "collections" in driver.body_text().lower(), "organization collections page did not load")
@@ -356,9 +401,17 @@ def create_organization_objects(driver: Driver, member_email: str) -> None:
     driver.fill_label("Name", "Synthetic Shared Collection")
     driver.click_text("Save")
     wait_for(lambda: "synthetic shared collection" in driver.body_text().lower(), "collection was not created")
+    wait_for(
+        lambda: "created collection synthetic shared collection" not in driver.body_text().lower(),
+        "collection success notification did not clear",
+        20,
+    )
 
     driver.click_text("Members")
-    wait_for(lambda: "members" in driver.body_text().lower(), "organization members page did not load")
+    wait_for(
+        lambda: bool(driver.execute("return location.hash.includes('/members')")),
+        "organization members page did not load",
+    )
     driver.click_first("Invite member", "Invite user")
     driver.fill_label("Email", member_email)
     # The default explicit member role is User. Saving it exercises the role contract.
@@ -382,13 +435,25 @@ def create_organization_objects(driver: Driver, member_email: str) -> None:
         # Some Web Vault builds mark a local existing account as confirmed immediately.
         pass
 
+    wait_for(
+        lambda: all(
+            message not in driver.body_text().lower()
+            for message in ("user(s) invited", "synthetic member confirmed")
+        ),
+        "member success notifications did not clear",
+        25,
+    )
     driver.click_text("Groups")
-    wait_for(lambda: "groups" in driver.body_text().lower(), "organization groups page did not load")
-    try:
-        driver.click_first("New group", "Add group")
-    except RuntimeError:
-        fail("organization group creation action is unavailable")
-    driver.fill_label("Name", "Synthetic Editors")
+    wait_for(
+        lambda: bool(driver.execute("return location.hash.includes('/groups')")),
+        "organization groups page did not load",
+    )
+    driver.click_first("New group", "Add group")
+    def fill_group_name() -> bool:
+        driver.fill_label("Name", "Synthetic Editors")
+        return True
+
+    wait_for(fill_group_name, "organization group form did not finish loading", 30)
     driver.click_text("Save")
     wait_for(lambda: "synthetic editors" in driver.body_text().lower(), "organization group was not created")
 

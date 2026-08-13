@@ -21,9 +21,10 @@ final class ModuleConfigure extends BaseModuleCommand {
     protected function execute(InputInterface $input, OutputInterface $output): int {
         try {
             $key = (string)$input->getArgument('key');
-            if (preg_match('/password|token|credential|secret(?!Ready)/i', $key) === 1) {
-                throw new \RuntimeException('Secret values are not accepted by this command.');
-            }
+            // ModuleService accepts only manifest-declared, typed non-secret
+            // values (plus the boolean secretReady attestation). This permits
+            // declarations such as sipCredentialStorageReady without ever
+            // accepting an actual credential value.
             $status = $this->moduleService->configure(
                 (string)$input->getArgument('id'),
                 $key,

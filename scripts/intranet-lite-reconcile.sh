@@ -105,8 +105,12 @@ make_secrets_file() {
 
 http_status() {
   local method=$1 url=$2 netrc=$3
+  local -a method_args=(--request "$method")
+  if [ "$method" = HEAD ]; then
+    method_args=(--head)
+  fi
   curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-    --netrc-file "$netrc" --request "$method" "$url"
+    --netrc-file "$netrc" "${method_args[@]}" "$url"
 }
 
 ensure_group_share() {
@@ -140,6 +144,8 @@ if [ "$ALLOW_TEST_HTTP" = true ]; then
 else
   [[ "$BASE_URL" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] || die 'a configured HTTPS URL is required'
 fi
+url_host=${BASE_URL#*://}
+url_host=${url_host%%:*}
 compose config -q
 
 for group in intranet-editor employee manager; do
@@ -166,7 +172,7 @@ if [ "$MODE" = reconcile ]; then
   editor_netrc=$(mktemp)
   trap 'rm -f -- "$editor_netrc"' EXIT INT TERM
   chmod 600 "$editor_netrc"
-  printf 'machine %s login intranet-editor-demo password %s\n' "${BASE_URL#*://}" "$editor_password" >"$editor_netrc"
+  printf 'machine %s login intranet-editor-demo password %s\n' "$url_host" "$editor_password" >"$editor_netrc"
   unset editor_password reader_password outsider_password
   public_url="$BASE_URL/remote.php/dav/files/intranet-editor-demo/Intranet%20Lite"
   confidential_url="$BASE_URL/remote.php/dav/files/intranet-editor-demo/Intranet%20Lite%20-%20Confidential"
@@ -197,7 +203,6 @@ reader_netrc=$(mktemp)
 outsider_netrc=$(mktemp)
 trap 'rm -f -- "$editor_netrc" "$reader_netrc" "$outsider_netrc"' EXIT INT TERM
 chmod 600 "$editor_netrc" "$reader_netrc" "$outsider_netrc"
-url_host=${BASE_URL#*://}
 printf 'machine %s login intranet-editor-demo password %s\n' "$url_host" "$editor_password" >"$editor_netrc"
 printf 'machine %s login intranet-reader-demo password %s\n' "$url_host" "$reader_password" >"$reader_netrc"
 printf 'machine %s login intranet-outsider-demo password %s\n' "$url_host" "$outsider_password" >"$outsider_netrc"
@@ -219,7 +224,11 @@ for page in current-news handbook processes contacts faq templates-and-links; do
 done
 providers=$(curl --fail --silent --show-error --netrc-file "$reader_netrc" \
   -H 'OCS-APIRequest: true' -H 'Accept: application/json' "$BASE_URL/ocs/v2.php/search/providers?format=json")
-jq -e '.ocs.meta.statuscode == 100 and (.ocs.data | type == "array")' <<<"$providers" >/dev/null ||
+jq -e \
+  '.ocs.meta.status == "ok"
+   and (.ocs.meta.statuscode == 100 or .ocs.meta.statuscode == 200)
+   and (.ocs.data | type == "array")
+   and (.ocs.data | any(.id == "files"))' <<<"$providers" >/dev/null ||
   die 'Nextcloud unified-search provider API is unavailable'
 
 printf 'intranet-lite-reconcile: apps, roles, fictional content, search API, and confidential-area permissions passed\n'

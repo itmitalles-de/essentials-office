@@ -5,15 +5,18 @@ task list, infer live state from dated evidence, or touch production systems.
 
 ## Now — paused autonomous validation
 
-- [ ] Finish the disposable TLS Vaultwarden browser flow: synthetic account
+- [x] Finish the disposable TLS Vaultwarden browser flow: synthetic account
   login, organization, collection, owner/member roles, and group; then rerun
   consistent SQLite backup, checksum verification, encrypted temporary Restic
-  roundtrip, and restore to a completely empty target. Confirm logical module
-  deactivation preserves data.
+  roundtrip, and restore to a completely empty target.
 - [ ] Run the combined clean deployment harness with automated browser Admin
   Center, recovery, HR Lite, Intranet Lite, and Talk flows. Prove second-run
   idempotence, permissions, restart persistence, WebDAV data/share recovery,
-  and complete resource cleanup.
+  content/volume preservation across logical module deactivation, and complete
+  resource cleanup. The interrupted run proved core/app setup and
+  targeted HR/Intranet reconciliation; resume by proving module controls after
+  the `sipCredentialStorageReady` allow-list fix, then browser E2E, Talk,
+  redeployment, persistence, and recovery.
 - [ ] Correct every failure found by that combined run. Do not weaken assertions
   merely to make the suite green, and do not claim app-specific objects that
   could not be provisioned through supported interfaces.
@@ -27,9 +30,10 @@ task list, infer live state from dated evidence, or touch production systems.
   NUC, public external, and production. Mark unsupported claims as unverified.
 - [ ] Create `docs/NICE_TO_HAVE.md` containing only the requested future items;
   add no code, stubs, images, or dependencies for them.
-- [ ] Commit remaining work in focused stages, push
-  `agent/essentials-office-autonomous`, and open a superseding draft PR. Keep it
-  draft while external gates remain; do not merge PR #1 or the new PR.
+- [ ] Commit and push the remaining fixes to
+  `agent/essentials-office-autonomous` and update superseding draft PR #2. Keep
+  it draft while required checks or external gates remain; do not merge PR #1
+  or PR #2 prematurely.
 
 ## Functional gaps to resolve or document honestly
 
@@ -73,4 +77,7 @@ task list, infer live state from dated evidence, or touch production systems.
   Intranet Lite, and Essentials+ Calls boundaries with inactive defaults.
 - [x] Hardened secret handling, backup evidence, restore checks, metrics, image
   major-version policy, fake service contracts, and disposable test harnesses.
+- [x] Proved the closed Vaultwarden product profile, TLS browser organization/
+  collection/role/group flow, encrypted backup, and empty-target restore with
+  synthetic data only.
 - [x] Kept all real NUC, Caddy, DNS, network, backups, and user data untouched.

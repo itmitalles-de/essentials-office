@@ -27,6 +27,12 @@ Vaultwarden is an unofficial Bitwarden-compatible server from the upstream
 notices, and Web Vault/upstream notices when operating or redistributing it.
 The repository does not claim Bitwarden affiliation or support.
 
+Organization groups require Vaultwarden's `ORG_GROUPS_ENABLED=true` setting.
+Upstream marks this feature as **beta with known issues** in version 1.37.1.
+The example enables it because groups are part of the Office module contract;
+operators must review that warning and the upstream changelog before each
+upgrade rather than treating group semantics as unconditionally stable.
+
 ## Private deployment
 
 The module never publishes a Docker host port. It joins the existing external
