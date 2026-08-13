@@ -25,7 +25,8 @@ Der aktuelle Nextcloud-Core auf dem NUC ist validiert und darf nicht beiläufig 
 - persistente Daten unter `/srv/nextcloud`
 - Secrets ausschließlich lokal in `.env`
 - Domain derzeit noch nicht öffentlich live
-- lokales Backup getestet; Restore und verschlüsseltes Offsite-Backup noch offen
+- lokales Backup und Wegwerf-Restore getestet; verschlüsseltes Offsite-Backup
+  ist bis unmittelbar vor der ersten Nutzung echter Daten zurückgestellt
 
 Keine Migration zu Nextcloud AIO ohne eigenen Vergleich, Rollback und ausdrückliche Entscheidung.
 
@@ -47,6 +48,8 @@ Keine Migration zu Nextcloud AIO ohne eigenen Vergleich, Rollback und ausdrückl
 4. Vor Änderungen an persistenten Daten: Backup, Restore-Schritt und Rollback definieren.
 5. Keine automatische Major-Version-Aktualisierung.
 6. Demo- und Produktionsmodus klar trennen.
+7. Der aktuelle Slice priorisiert einen idempotenten IaC-Deploy aus dem
+   Repository; Offsite-Backup bleibt ein dokumentiertes Gate vor echten Daten.
 
 ## Verifikation
 

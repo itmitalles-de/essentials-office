@@ -1,0 +1,31 @@
+[Unit]
+Description=Create and verify an encrypted offsite backup of Nextcloud
+Documentation=file:/opt/nextcloud/docs/operations/BACKUP_RESTORE.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/nextcloud/offsite-backup.env
+
+[Service]
+Type=oneshot
+ExecStart=/opt/nextcloud/scripts/offsite-backup.sh
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=full
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

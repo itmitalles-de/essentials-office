@@ -39,3 +39,20 @@ Workspace Suite ist ein integriertes Produkt, aber kein einzelner untrennbarer C
 ## Kapazitätsentscheidung
 
 Der NUC besitzt 16 GiB RAM. mailcow dokumentiert mindestens 6 GiB RAM plus Swap; Nextcloud, PostgreSQL, Redis, Collabora und Talk benötigen zusätzlich Ressourcen. Deshalb ist „alles produktiv auf einem NUC“ kein belastbarer Standard. Für Demo/Entwicklung sind selektiv aktivierte Profile möglich; für Produktion sollten Mail und gegebenenfalls TURN/HPB getrennt betrieben werden.
+
+## Reproduzierbare Betriebsbausteine
+
+| Baustein | Repository-Artefakt | Standardzustand |
+| --- | --- | --- |
+| Nextcloud Core | `compose.yaml` | bestehend, unverändert führend |
+| Verschlüsseltes Offsite-Backup | `scripts/offsite-backup.sh` | erst nach Restic-Zielkonfiguration |
+| Wegwerf-Restore | `tests/restore/compose.yaml` | nur für expliziten Testlauf |
+| Nextcloud Apps | `config/nextcloud-apps.txt` | explizit abzugleichen |
+| Collabora | `compose.collabora.yaml`, Profil `office` | aus |
+| TURN | `compose.talk-turn.yaml`, Profil `talk-turn` | aus |
+| Talk HPB | nur dokumentierte spätere Stufe | nicht implementiert |
+| mailcow | separater Upstream-Checkout, Commit in `mailcow/UPSTREAM_COMMIT` | nicht installiert |
+
+Optionale Profile dürfen den Core nicht zum Starten benötigen. Umgekehrt darf
+das Stoppen eines Profils den Core, seine Volumes oder `proxy_net` nicht
+entfernen. Öffentliche Routen werden erst nach dem Caddy-Drift-Gate ergänzt.

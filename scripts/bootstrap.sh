@@ -2,10 +2,10 @@
 # Prepare a new Nextcloud host without overwriting data or existing secrets.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$PROJECT_DIR/.env"
-DATA_ROOT=/srv/nextcloud
+DATA_ROOT=
 CREATED_ENV=false
 
 die() {
@@ -80,6 +80,14 @@ fi
 for key in POSTGRES_PASSWORD NEXTCLOUD_ADMIN_PASSWORD REDIS_PASSWORD; do
   [ -n "$(env_value "$key")" ] || die "$key is empty in $ENV_FILE; refusing to replace an existing file"
 done
+
+DATA_ROOT=$(env_value NEXTCLOUD_DATA_ROOT)
+[ -n "$DATA_ROOT" ] || die 'NEXTCLOUD_DATA_ROOT is empty in .env'
+case "$DATA_ROOT" in
+  /*) ;;
+  *) die 'NEXTCLOUD_DATA_ROOT must be an absolute path' ;;
+esac
+[ "$DATA_ROOT" != / ] || die 'NEXTCLOUD_DATA_ROOT must not be the filesystem root'
 
 proxy_network=$(env_value PROXY_NETWORK)
 [ -n "$proxy_network" ] || die 'PROXY_NETWORK is empty in .env'

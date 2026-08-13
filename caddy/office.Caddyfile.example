@@ -1,0 +1,4 @@
+# Merge only after validating the complete shared Caddyfile and its running state.
+office.itmitalles.de {
+	reverse_proxy collabora:9980
+}

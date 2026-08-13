@@ -19,7 +19,17 @@ Workspace Suite is composed of independently operable modules:
 - mailcow as an independently managed mail subsystem; SOGo is an optional fallback webmail, not a second canonical calendar/contact system
 - centralized OIDC/SSO only after the core modules are stable
 
-The current NUC deployment contains only the validated Nextcloud core. Collabora, Talk infrastructure and mailcow are target modules, not yet implemented here. mailcow must not be pasted into the Nextcloud Compose file: it has its own lifecycle, ports, DNS, backups and substantial memory requirements. A production mail system should use infrastructure with a static address and controllable PTR/rDNS rather than relying on a residential dynamic connection.
+The current NUC deployment contains only the validated Nextcloud core. This
+repository now defines declarative apps, an optional dedicated Collabora
+overlay, an optional coturn overlay, encrypted offsite backup automation, and
+an isolated restore test. These additions are disabled until their documented
+gates pass; their presence in Git does not mean they are deployed. The Talk
+high-performance backend remains a later stage. mailcow remains a separately
+pinned upstream project and must not be pasted into the Nextcloud Compose file:
+it has its own lifecycle, ports, DNS, backups and substantial memory
+requirements. A production mail system should use infrastructure with a static
+address and controllable PTR/rDNS rather than relying on a residential dynamic
+connection.
 
 The repository deliberately contains no secrets and no user data. It deploys
 Nextcloud 34 (Apache), PostgreSQL 17, Redis 7, and a dedicated Nextcloud cron
@@ -45,6 +55,34 @@ Status verified on 2026-08-12:
   before its existing configuration is reloaded.
 - Local backups exist on the same NVMe. A tested restore plus encrypted offsite
   backup remain mandatory before production data is migrated.
+- A 2026-08-13 follow-up authenticated to the NUC, confirmed that public DNS
+  still has no `cloud` A/AAAA record, proved Caddy disk/runtime equivalence,
+  measured the core, and restored a fresh live backup on isolated disposable
+  infrastructure. See [NUC baseline and validation gate](docs/operations/NUC_BASELINE.md).
+
+## Reproducible operations
+
+The base stack remains `compose.yaml`. Optional capabilities are independent:
+
+| Capability | Artifact | Default |
+| --- | --- | --- |
+| Idempotent core/app deployment | `scripts/deploy.sh --apps` | explicit |
+| Encrypted offsite backup | `scripts/offsite-backup.sh` | not scheduled |
+| Disposable restore | `scripts/restore-test.sh` | run on demand |
+| Declared Nextcloud apps | `scripts/reconcile-apps.sh` | no implicit mutation |
+| Dedicated Collabora | `compose.collabora.yaml`, profile `office` | off |
+| coturn | `compose.talk-turn.yaml`, profile `talk-turn` | off |
+| mailcow | separate upstream checkout pinned by `mailcow/UPSTREAM_COMMIT` | not installed |
+
+Operational runbooks:
+
+- [IaC deployment](docs/operations/IAC_DEPLOYMENT.md)
+- [Backup and restore](docs/operations/BACKUP_RESTORE.md)
+- [Nextcloud apps](docs/operations/NEXTCLOUD_APPS.md)
+- [Collabora](docs/operations/COLLABORA.md)
+- [Talk and TURN](docs/operations/TALK.md)
+- [mailcow boundary](mailcow/README.md)
+- [Fictitious end-to-end demo](docs/operations/DEMO_FLOW.md)
 
 ## Architecture
 
@@ -82,7 +120,9 @@ All persistent service state is below `/srv/nextcloud`:
 
 ## Prerequisites
 
-- Ubuntu host with Docker Engine and Docker Compose v2.
+- Ubuntu host. `scripts/provision-host.sh` installs Docker Engine, Docker
+  Compose v2, and the required base tools from the official Docker apt
+  repository; `--check` validates an existing host without mutation.
 - A shared external Docker network named `proxy_net`, or no network with that
   name. `bootstrap.sh` creates it only when absent.
 - Shared Caddy connected to that network and owning host ports 80 and 443.
@@ -97,29 +137,31 @@ another proxy and never publishes a Nextcloud application host port.
 
 ## Installation
 
-Clone this repository on the NUC at `/opt/nextcloud`, then run the bootstrap.
-The bootstrap validates prerequisites, pulls the three declared images if they
-are absent (to obtain their actual service UIDs), creates `/srv/nextcloud`,
-generates cryptographically strong secrets in `.env`, creates `proxy_net` only
-if needed, determines its actual CIDR, and validates `docker compose config`.
-It never replaces an existing `.env` or changes a non-empty data directory.
+Clone this repository on the NUC at `/opt/nextcloud`, provision the host when
+needed, and apply the repository state. The deployment command bootstraps the
+host directories and local `.env`, validates Compose, starts the core, waits
+for health, enables cron mode, and optionally reconciles all declared apps. It
+never replaces an existing `.env` or changes ownership of a non-empty data
+directory.
 
 ```bash
 sudo install -d -m 0755 -o "$USER" -g "$USER" /opt/nextcloud
 git clone https://github.com/itmitalles-de/cloud.itmitalles.de.git /opt/nextcloud
 cd /opt/nextcloud
-./scripts/bootstrap.sh
+sudo ./scripts/provision-host.sh
+sudo ./scripts/deploy.sh --apps
 ```
 
-After DNS and Caddy are in place, start the services and set the supported
-background-job mode to cron:
+The internal deploy succeeds without public DNS or Caddy. After DNS and the
+separately managed Caddy route are in place, run the external checks:
 
 ```bash
-cd /opt/nextcloud
-docker compose up -d
-docker compose exec -T -u www-data app php occ background:cron
 ./scripts/healthcheck.sh --file-roundtrip
 ```
+
+Use `sudo ./tests/deploy/run.sh --apps` to prove a clean deployment, all apps,
+restart persistence, and a second idempotent deployment with unique temporary
+paths and containers. See the [IaC runbook](docs/operations/IAC_DEPLOYMENT.md).
 
 The initial administrator account and its generated password are in the
 NUC-local `/opt/nextcloud/.env` (mode `0600`), never in Git. Store an encrypted
@@ -228,15 +270,23 @@ sudo ./scripts/backup.sh
 
 The script takes an exclusive lock, enables maintenance mode, creates a
 consistent PostgreSQL custom-format dump, archives the persistent Nextcloud
-filesystem (`html`, `data`, and `redis`), stores a resolved but secret-redacted
+filesystem (`html` and `data`), stores a resolved but secret-redacted
 Compose configuration, and reliably disables maintenance mode even when a
 command fails. It intentionally does **not** copy the live PostgreSQL data
-directory: the logical `pg_dump` is the consistent database backup.
+directory: the logical `pg_dump` is the consistent database backup. Redis is
+also not restored from a stale AOF; it is cache/locking/session state and is
+recreated empty during disaster recovery. PostgreSQL object owners and ACLs are
+retained because Nextcloud 34 can use a dedicated application database role.
 
-The default target is `/srv/nextcloud/backups`. This is convenient for local
+The default target is `<NEXTCLOUD_DATA_ROOT>/backups` (production:
+`/srv/nextcloud/backups`). This is convenient for local
 recovery only; it does not protect against NVMe failure, theft, fire, or a
 destructive host incident. External, encrypted, tested offsite backups are a
 required follow-up before treating the service as production-safe.
+`scripts/offsite-backup.sh` implements that follow-up with restic, root-only
+repository/password files, and a post-upload repository check. The live `.env`
+is included only inside restic's encrypted snapshot. See the backup runbook for
+setup and the isolated restore test.
 
 ### Restore and disaster recovery order
 
@@ -245,11 +295,13 @@ required follow-up before treating the service as production-safe.
 2. Restore the protected `/opt/nextcloud/.env` from secret management with mode
    `0600`; use the committed `compose.yaml` from the same backup/repository
    revision.
-3. Recreate `proxy_net`, restore `html`, `data`, and `redis` to
-   `/srv/nextcloud`, and recreate the empty `/srv/nextcloud/postgres` directory
-   with the UID/GID expected by the PostgreSQL image.
-4. Start only `db`, then restore `nextcloud.pg.dump` with `pg_restore` as the
-   `nextcloud` database user. Do not overwrite a populated database blindly.
+3. Recreate `proxy_net`, restore `html` and `data` to `/srv/nextcloud`, and
+   recreate empty `/srv/nextcloud/postgres` and `/srv/nextcloud/redis`
+   directories with the UID/GID expected by their images.
+4. Start only `db`, recreate the application database login from the protected
+   `config.php` without logging its password, then restore `nextcloud.pg.dump`
+   with `pg_restore` as the administrative database user. Preserve dump owners
+   and ACLs; do not overwrite a populated database blindly.
 5. Start `redis`, `app`, and `cron`; run `php occ maintenance:repair` only after
    inspecting `occ status` and the restore logs.
 6. Set background jobs to cron, enable Caddy only after `occ status` is healthy,
@@ -279,6 +331,15 @@ Nextcloud majors one at a time, following the official release path, with a
 tested restore point and maintenance window.
 
 ## Validation checklist
+
+GitHub Actions runs only repository-safe checks: base and overlay Compose
+rendering, recursive Bash syntax, ShellCheck, and a full-history Gitleaks scan.
+It deliberately does not simulate the NUC, Caddy, public DNS/TLS, WebDAV,
+Collabora, TURN, or restore. Run the same static checks locally with:
+
+```bash
+./scripts/validate-static.sh
+```
 
 `healthcheck.sh` verifies running containers, Compose status, PostgreSQL,
 Redis, installed/non-maintenance `occ` status, cron mode, public and Caddy-local
@@ -335,13 +396,21 @@ Before production use, also verify:
 
 ## Open operational items
 
+- Authenticate to the actual NUC and create a fresh read-only inventory; do not
+  reload Caddy until its disk/runtime result is `match`.
 - Enable Namecheap Dynamic DNS and create the `cloud` A + Dynamic DNS record,
   then enter its per-domain password locally on the NUC.
 - Verify from a genuinely external network whether the Netgear router has a
   forwardable public IPv4 and whether TCP 80/443 reach Caddy. If it does not,
   choose a DNS provider with dynamic `AAAA` support and verify the IPv6 path.
 - Reconcile any existing Caddy configuration drift before reloading it.
-- Put encrypted backups and the generated `.env` into independently stored,
-  offsite backup/secret management, then test a restore.
+- Before any real personal, customer, or mail data is stored: configure the
+  Google Drive/restic target, upload the generated `.env` only through the
+  encrypted snapshot, and pass the disposable offsite restore test. This is
+  deliberately deferred during the fictitious-data IaC phase.
+- Reconcile the declared Nextcloud apps, then enable and accept Collabora before
+  beginning TURN work. HPB remains gated on successful external TURN tests.
+- Select and validate a separate mailcow VM/VPS before following the pinned
+  upstream lifecycle.
 - Define users, groups, sharing policy, retention, and the Dropbox migration
   plan before importing production data.

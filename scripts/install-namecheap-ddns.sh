@@ -5,8 +5,9 @@ readonly env_file="/etc/namecheap-ddns.env"
 readonly updater_target="/usr/local/sbin/namecheap-ddns"
 readonly service_target="/etc/systemd/system/namecheap-ddns.service"
 readonly timer_target="/etc/systemd/system/namecheap-ddns.timer"
-readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-readonly repo_root="$(cd -- "$script_dir/.." && pwd -P)"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+repo_root="$(cd -- "$script_dir/.." && pwd -P)"
+readonly script_dir repo_root
 
 fail() {
     printf 'ERROR: %s\n' "$*" >&2

@@ -1,0 +1,12 @@
+# One Nextcloud App Store ID per line. Keep canonical groupware in Nextcloud.
+spreed
+mail
+calendar
+contacts
+tasks
+notes
+collectives
+deck
+tables
+forms
+richdocuments
