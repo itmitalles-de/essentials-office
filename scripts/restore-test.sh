@@ -142,8 +142,7 @@ if [ -n "$verify_user" ] || [ -n "$verify_password" ]; then
   [ -n "$verify_user" ] && [ -n "$verify_password" ] && [ -n "$verify_owner" ] || die 'restore verification credentials are incomplete'
   netrc="$WORK_DIR/verify.netrc"
   downloaded="$WORK_DIR/recovered-file"
-  chmod 0600 "$netrc"
-  printf 'machine 127.0.0.1 login %s password %s\n' "$verify_user" "$verify_password" >"$netrc"
+  (umask 077; printf 'machine 127.0.0.1 login %s password %s\n' "$verify_user" "$verify_password" >"$netrc")
   compose cp "$netrc" app:/tmp/restore-verify.netrc >/dev/null
   compose exec -T app chmod 0600 /tmp/restore-verify.netrc
   compose exec -T app curl --fail --silent --show-error \
