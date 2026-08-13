@@ -2,8 +2,8 @@
 # Prepare the optional Vaultwarden module without touching the Nextcloud core.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE=${VAULTWARDEN_ENV_FILE:-"$PROJECT_DIR/.vaultwarden.env"}
 DATA_DIR=${VAULTWARDEN_DATA_DIR:-/srv/vaultwarden/data}
 BACKUP_DIR=${VAULTWARDEN_BACKUP_DIR:-/srv/vaultwarden/backups}
@@ -95,7 +95,7 @@ if [ "$ENABLE_ADMIN" = true ]; then
   admin_hash=$(printf '%s' "$admin_token" | docker run --rm -i \
     --entrypoint /vaultwarden vaultwarden/server:1.37.1 hash)
   unset admin_token admin_token_repeat
-  [[ "$admin_hash" == '$argon2'* ]] || die 'Vaultwarden did not return an Argon2 admin-token hash'
+  [[ "$admin_hash" == \$argon2* ]] || die 'Vaultwarden did not return an Argon2 admin-token hash'
   sed -i "s|^# ADMIN_TOKEN=.*|ADMIN_TOKEN='$admin_hash'|" "$ENV_FILE"
   unset admin_hash
 fi

@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>essentialsplus</id>
+    <name>Essentials+ Office</name>
+    <summary>Safe, manifest-driven module administration for Essentials+ Office.</summary>
+    <description>Shows entitled modules to users and gives administrators a health-gated, audited module catalog without host-level control.</description>
+    <version>1.0.0</version>
+    <licence>agpl</licence>
+    <author>itmitalles.de</author>
+    <namespace>EssentialsPlus</namespace>
+    <category>tools</category>
+    <dependencies>
+        <nextcloud min-version="34" max-version="34"/>
+    </dependencies>
+    <navigations>
+        <navigation>
+            <name>Essentials+ Office</name>
+            <route>essentialsplus.page.index</route>
+            <order>90</order>
+            <icon>app.svg</icon>
+        </navigation>
+    </navigations>
+    <background-jobs>
+        <job>OCA\EssentialsPlus\BackgroundJob\ModuleHealthJob</job>
+    </background-jobs>
+    <commands>
+        <command>OCA\EssentialsPlus\Command\ModuleList</command>
+        <command>OCA\EssentialsPlus\Command\ModuleStatus</command>
+        <command>OCA\EssentialsPlus\Command\ModuleEnable</command>
+        <command>OCA\EssentialsPlus\Command\ModuleDisable</command>
+        <command>OCA\EssentialsPlus\Command\ModuleDoctor</command>
+        <command>OCA\EssentialsPlus\Command\ModuleConfigure</command>
+        <command>OCA\EssentialsPlus\Command\Metrics</command>
+    </commands>
+    <settings>
+        <admin>OCA\EssentialsPlus\Settings\Admin</admin>
+        <admin-section>OCA\EssentialsPlus\Settings\AdminSection</admin-section>
+    </settings>
+</info>

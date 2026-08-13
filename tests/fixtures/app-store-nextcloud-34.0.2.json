@@ -1,0 +1,14 @@
+[
+  {"id": "announcementcenter", "releases": [{"version": "7.5.0"}]},
+  {"id": "calendar", "releases": [{"version": "6.5.3"}]},
+  {"id": "collectives", "releases": [{"version": "4.5.0"}]},
+  {"id": "contacts", "releases": [{"version": "8.7.6"}]},
+  {"id": "deck", "releases": [{"version": "1.18.3"}]},
+  {"id": "forms", "releases": [{"version": "5.3.5"}]},
+  {"id": "mail", "releases": [{"version": "5.9.3"}]},
+  {"id": "notes", "releases": [{"version": "6.0.1"}]},
+  {"id": "richdocuments", "releases": [{"version": "11.1.0"}]},
+  {"id": "spreed", "releases": [{"version": "24.0.3"}]},
+  {"id": "tables", "releases": [{"version": "2.2.1"}]},
+  {"id": "tasks", "releases": [{"version": "0.18.1"}]}
+]

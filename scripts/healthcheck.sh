@@ -34,7 +34,9 @@ roundtrip_file() {
   local admin password netrc source download remote_id remote_path
   admin=$(env_value NEXTCLOUD_ADMIN_USER)
   password=$(env_value NEXTCLOUD_ADMIN_PASSWORD)
-  [ -n "$admin" ] && [ -n "$password" ] || die 'admin credentials are missing from .env'
+  if [ -z "$admin" ] || [ -z "$password" ]; then
+    die 'admin credentials are missing from .env'
+  fi
 
   netrc=$(mktemp)
   source=$(mktemp)

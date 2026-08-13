@@ -1,7 +1,7 @@
 services:
   turn:
     image: coturn/coturn:4.17.2-r0@sha256:aa68aab64a3b929d57fc2924c98ea447bf996cf8dade2508e7b71eaf23f1f14e
-    container_name: nextcloud-turn
+    container_name: ${TURN_CONTAINER_NAME:-nextcloud-turn}
     profiles:
       - talk-turn
     restart: unless-stopped

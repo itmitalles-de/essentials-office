@@ -2,8 +2,8 @@
 # Create only fictional HR Lite groups, users, templates, and a protected share.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}
 HR_LITE_SECRETS_FILE=${HR_LITE_SECRETS_FILE:-"$PROJECT_DIR/.hr-lite-demo.env"}
 BASE_URL=

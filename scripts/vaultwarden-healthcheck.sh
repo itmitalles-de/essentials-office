@@ -2,10 +2,11 @@
 # Check the isolated Vaultwarden container without requiring a public route.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}
 VAULTWARDEN_COMPOSE_PROJECT_NAME=${VAULTWARDEN_COMPOSE_PROJECT_NAME:-}
+VAULTWARDEN_CONTAINER_NAME=${VAULTWARDEN_CONTAINER_NAME:-essentialsplus-office-vaultwarden}
 
 die() {
   printf 'vaultwarden-healthcheck: %s\n' "$*" >&2
@@ -31,8 +32,12 @@ done
 
 compose config -q
 compose ps --status running --services | grep -Fxq vaultwarden || die 'vaultwarden is not running'
-health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' office-vaultwarden)
+container_id=$(compose ps -q vaultwarden)
+[ -n "$container_id" ] || die 'Vaultwarden container ID is unavailable'
+health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")
 [ "$health" = healthy ] || die "Vaultwarden container health is $health"
-docker port office-vaultwarden 8080 | grep -q . && die 'Vaultwarden must not publish a host port'
+if docker port "$container_id" 8080 | grep -q .; then
+  die 'Vaultwarden must not publish a host port'
+fi
 compose exec -T vaultwarden /healthcheck.sh >/dev/null || die 'Vaultwarden internal health check failed'
 printf 'vaultwarden-healthcheck: isolated container is healthy and has no host port\n'

@@ -2,8 +2,8 @@
 # Make a consistent SQLite backup of the optional Vaultwarden data directory.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 DATA_DIR=${VAULTWARDEN_DATA_DIR:-/srv/vaultwarden/data}
 BACKUP_ROOT=${VAULTWARDEN_BACKUP_DIR:-/srv/vaultwarden/backups}
 SQLITE_IMAGE=keinos/sqlite3:3.51.3

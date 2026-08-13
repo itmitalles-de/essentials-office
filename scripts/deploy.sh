@@ -70,6 +70,10 @@ docker compose exec -T -u www-data app php occ background:cron >/dev/null
 
 if [ "$DEPLOY_APPS" = true ]; then
   "$SCRIPT_DIR/reconcile-apps.sh"
+  doctor_output=$(docker compose exec -T -u www-data app php occ essentialsplus:module:doctor nextcloud-core) || {
+    printf '%s\n' "$doctor_output" >&2
+    die 'Essentials+ Office core module health reconciliation failed'
+  }
   "$SCRIPT_DIR/healthcheck.sh" --core-only
 fi
 

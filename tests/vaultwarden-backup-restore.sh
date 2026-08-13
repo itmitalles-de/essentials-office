@@ -2,8 +2,8 @@
 # Start only the optional Vaultwarden profile and prove backup/restore in /tmp.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 TEST_ROOT=$(mktemp -d /tmp/office-vaultwarden-test.XXXXXX)
 PROJECT_NAME="office-vaultwarden-test-$RANDOM"
 PROXY_NETWORK="office-vaultwarden-test-proxy-$RANDOM"
@@ -40,8 +40,8 @@ for command in docker grep install sed touch; do
   command -v "$command" >/dev/null 2>&1 || die "$command is required"
 done
 docker info >/dev/null 2>&1 || die 'Docker daemon is not available'
-if docker ps --format '{{.Names}}' | grep -Fxq office-vaultwarden; then
-  die 'office-vaultwarden already exists; refusing to interfere with an existing module'
+if docker ps --format '{{.Names}}' | grep -Fxq essentialsplus-office-vaultwarden; then
+  die 'the default Vaultwarden container already exists; refusing to interfere with an existing module'
 fi
 
 cp "$PROJECT_DIR/.env.example" "$CORE_ENV"
@@ -59,6 +59,7 @@ chown 1000:1000 "$DATA_DIR"
 docker network create "$PROXY_NETWORK" >/dev/null
 CREATED_NETWORK=true
 export PROXY_NETWORK VAULTWARDEN_ENV_FILE="$VAULT_ENV" VAULTWARDEN_DATA_DIR="$DATA_DIR" VAULTWARDEN_BACKUP_DIR="$BACKUP_DIR"
+export VAULTWARDEN_CONTAINER_NAME="$PROJECT_NAME-vaultwarden"
 
 compose config -q
 compose up -d --wait vaultwarden >/dev/null
