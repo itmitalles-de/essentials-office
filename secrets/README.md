@@ -15,3 +15,17 @@ The optional Namecheap Dynamic DNS integration stores its per-domain password
 only in `/etc/namecheap-ddns.env` on the NUC. The interactive installer creates
 that file as `root:root` with mode `0600`. It must not be copied into this
 directory or any other Git working tree.
+
+The optional Vaultwarden overlay keeps its independent operational settings in
+`/opt/nextcloud/.vaultwarden.env` with mode `0600`; its data and backups live
+below `/srv/vaultwarden`, never below `/srv/nextcloud`. Do not copy its
+environment file, SQLite database, backups, generated keys, SMTP credentials,
+or an optional Argon2 admin-token hash into Git. See
+[`docs/office/VAULTWARDEN.md`](../docs/office/VAULTWARDEN.md).
+
+The synthetic HR Lite reconciler creates a mode-`0600`
+`/opt/nextcloud/.hr-lite-demo.env` only on an approved disposable instance.
+It must not be used for real people or copied to Git. The Office module and
+Visual PBX local activation files are configuration-only and use their ignored
+paths documented in `config/office-modules.env.example` and
+`integrations/visual-pbx.env.example`.

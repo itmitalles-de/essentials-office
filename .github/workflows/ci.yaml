@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare non-secret Compose environment
+        run: |
+          set -eu
+          cp .env.example /tmp/nextcloud-ci.env
+          sed -i \
+            -e 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=ci-postgres-password/' \
+            -e 's/^NEXTCLOUD_ADMIN_PASSWORD=$/NEXTCLOUD_ADMIN_PASSWORD=ci-nextcloud-password/' \
+            -e 's/^REDIS_PASSWORD=$/REDIS_PASSWORD=ci-redis-password/' \
+            /tmp/nextcloud-ci.env
+      - name: Validate base and Vaultwarden Compose files
+        run: |
+          set -eu
+          docker compose --env-file /tmp/nextcloud-ci.env config -q
+          VAULTWARDEN_ENV_FILE="$GITHUB_WORKSPACE/vaultwarden.env.example" \
+            docker compose --env-file /tmp/nextcloud-ci.env \
+              -f compose.yaml -f compose.vaultwarden.yaml --profile vaultwarden config -q
+      - name: Check shell syntax
+        run: bash -n scripts/*.sh tests/*.sh
+      - name: Check module contract
+        run: ./tests/office-modules-contract.sh
+      - name: Scan tracked implementation files for obvious secrets
+        run: ./scripts/check-secrets.sh --tracked

@@ -1,14 +1,14 @@
-# Workspace Suite
+# Office
 
-Open-source collaboration platform and self-hosted alternative to Microsoft 365 / Google Workspace. The existing production-grade Nextcloud foundation is deployed at `https://cloud.itmitalles.de`; the repository grows around that foundation without replacing it.
-
-
-
-> **Main product 3 of 3.** The product name is **Workspace Suite**. The public Nextcloud hostname remains `cloud.itmitalles.de`; the repository should later be renamed administratively to `itmitalles-de/workspace-suite`.
+**Office** is the Essentials Plus collaboration product: an open-source,
+self-hosted alternative to Microsoft 365 / Google Workspace. The existing
+Nextcloud foundation remains at `https://cloud.itmitalles.de`; this repository
+grows around it without replacing it. The repository name and working paths do
+not change as part of this work.
 
 ## Product scope
 
-Workspace Suite is composed of independently operable modules:
+Office is composed of independently operable modules:
 
 - Nextcloud Files, sharing, versions and sync
 - Calendar, Contacts and Tasks as the canonical groupware data store
@@ -16,10 +16,28 @@ Workspace Suite is composed of independently operable modules:
 - Nextcloud Office with a dedicated Collabora Online container for browser-based documents, spreadsheets and presentations
 - Nextcloud Mail connected to mailcow over IMAP/SMTP
 - Notes for personal notes, Collectives for shared knowledge, Deck for Kanban, plus Tables and Forms
+- Intranet Lite as an optional Nextcloud-native composition of Collectives,
+  Teams, Dashboard, and Announcement Center; Wiki.js and BookStack are not
+  parallel default services
+- Vaultwarden as an optional, private password vault for organisations,
+  collections, roles, and groups; it keeps its own SQLite data, backups, and
+  secrets
+- HR Lite as a strictly limited, synthetic Nextcloud workflow using groups,
+  Tables, Forms, Deck, Calendar, Collectives, and protected files
+- Visual PBX only as a disabled external-integration contract; the PBX product,
+  source code, database, secrets, and proxy stay separate
 - mailcow as an independently managed mail subsystem; SOGo is an optional fallback webmail, not a second canonical calendar/contact system
 - centralized OIDC/SSO only after the core modules are stable
 
-The current NUC deployment contains only the validated Nextcloud core. Collabora, Talk infrastructure and mailcow are target modules, not yet implemented here. mailcow must not be pasted into the Nextcloud Compose file: it has its own lifecycle, ports, DNS, backups and substantial memory requirements. A production mail system should use infrastructure with a static address and controllable PTR/rDNS rather than relying on a residential dynamic connection.
+The current NUC deployment contains only the validated Nextcloud core. The
+Vaultwarden overlay and Office module contracts are implemented in this
+repository but are deliberately inactive and unverified on the NUC. Collabora,
+Talk infrastructure, mailcow, Intranet Lite, HR Lite, and Visual PBX activation
+remain separate stages. mailcow must not be pasted into the Nextcloud Compose
+file: it has its own lifecycle, ports, DNS, backups and substantial memory
+requirements. A production mail system should use infrastructure with a static
+address and controllable PTR/rDNS rather than relying on a residential dynamic
+connection.
 
 The repository deliberately contains no secrets and no user data. It deploys
 Nextcloud 34 (Apache), PostgreSQL 17, Redis 7, and a dedicated Nextcloud cron
@@ -79,6 +97,68 @@ All persistent service state is below `/srv/nextcloud`:
 ├── redis/      Redis AOF data
 └── backups/    local backup archives
 ```
+
+## Office modules and Admin Center
+
+Office uses a versioned Essentials Plus module contract in
+[`office-modules.json`](office-modules.json), with a locally ignored activation
+file derived from
+[`config/office-modules.env.example`](config/office-modules.env.example). The
+only default-active module is the existing Nextcloud core. All optional modules
+start inactive; normal users must see a module only after it is both healthy and
+enabled for an entitled group. Administrators see the full grouped catalog in a
+restricted **Office Admin Center** Collective.
+
+| Theme | Optional modules |
+| --- | --- |
+| Collaboration | Collabora, Talk, Mail |
+| Knowledge and intranet | Intranet Lite |
+| People operations | HR Lite |
+| Security and access | Vaultwarden |
+| External integrations | Visual PBX |
+
+The detailed visibility contract and manual Nextcloud setup are in
+[`docs/office/ADMIN_CENTER.md`](docs/office/ADMIN_CENTER.md). Activating a
+module requires its configuration plus a successful module preflight; disabling
+it removes no data, databases, backups, or volumes.
+
+### Optional Vaultwarden
+
+Vaultwarden is a separate `vaultwarden` Compose profile in
+[`compose.vaultwarden.yaml`](compose.vaultwarden.yaml), pinned to the official
+upstream stable release `1.37.1` checked on 2026-08-13. It publishes no host
+port, uses a private Caddy route only when an administrator deliberately adds
+[`Caddyfile.vaultwarden.example`](Caddyfile.vaultwarden.example), closes
+registration by default, and stores its SQLite data under `/srv/vaultwarden`.
+It must not be made public in this MVP.
+
+The bootstrap, health check, consistent SQLite backup, empty-target restore,
+update, rollback, 2FA, and organisation procedures are documented in
+[`docs/office/VAULTWARDEN.md`](docs/office/VAULTWARDEN.md). Vaultwarden backups
+and the protected `.vaultwarden.env` must be independently encrypted and kept
+offsite; they are not part of a Nextcloud backup.
+
+### Optional HR Lite and Intranet Lite
+
+HR Lite has fictional-only groups (`hr-admin`, `manager`, `employee`), a
+reconciler, an entitlement/permission verifier, and templates for onboarding,
+offboarding, absence status, responsibilities, and confidential documents.
+Forms, Tables, Deck, Calendar, and Collectives lack a stable complete
+provisioning API, so their minimal manual target state is documented rather
+than implemented through SQL or fragile hacks. See
+[`docs/office/HR_LITE.md`](docs/office/HR_LITE.md).
+
+Intranet Lite is optional and deliberately stays within Collectives, Teams,
+Dashboard, and Announcement Center. Its activation and manual target state are
+in [`docs/office/INTRANET_LITE.md`](docs/office/INTRANET_LITE.md). Neither it
+nor Office installs Wiki.js or BookStack as a parallel default service.
+
+### Optional Visual PBX link
+
+Visual PBX remains a separately operated product. Office carries only an
+inactive, credential-free portal/health contract and does not proxy, expose, or
+merge the PBX proof of concept. The mandatory release gates and health check are
+in [`docs/integrations/VISUAL_PBX.md`](docs/integrations/VISUAL_PBX.md).
 
 ## Prerequisites
 
@@ -299,6 +379,15 @@ Before production use, also verify:
 - `docker ps` and `ss -ltnp` show no public PostgreSQL or Redis port.
 - The Nextcloud Administration overview has no unresolved security or setup
   warning that is relevant to this deployment.
+- The optional Vaultwarden profile has passed
+  `tests/vaultwarden-backup-restore.sh` with synthetic data, then its own
+  disposable-host restore and private Caddy test before it is exposed to users.
+- A module's `office-module-preflight.sh` succeeds before its entitlement/link
+  is published, and an unentitled test user cannot see the app or link.
+- HR Lite's `hr-lite-verify.sh --url ...` passes after its manual Forms,
+  Tables, Deck, Calendar, and Collectives target state is completed.
+- `visual-pbx-contract-check.sh` still reports the integration disabled unless
+  all separately documented PBX release gates and health check are complete.
 
 ## Security model
 
@@ -314,6 +403,14 @@ Before production use, also verify:
   HTTPS URL and reverse-proxy headers.
 - Container images are pinned to deliberate major versions. Patch/minor tags
   remain floating by design and are updated by the controlled script.
+- Vaultwarden is an independent optional profile with closed signups, no host
+  port, a private-only Caddy example, separate secret file, separate SQLite
+  backup/restore path, and no shared Nextcloud database or secrets.
+- Office never treats a configured external URL as an entitlement: configured
+  service health and group restriction are mandatory before a user-facing link.
+- Visual PBX is an inactive integration contract only. Office does not publicly
+  proxy its proof of concept, share SIP credentials, or claim authentication,
+  role, or rights controls that have not been proven in the PBX product.
 
 ## Troubleshooting
 
@@ -343,5 +440,9 @@ Before production use, also verify:
 - Reconcile any existing Caddy configuration drift before reloading it.
 - Put encrypted backups and the generated `.env` into independently stored,
   offsite backup/secret management, then test a restore.
+- On an approved disposable host, configure and test the optional Vaultwarden
+  profile and its private Caddy route before any Office entitlement is enabled.
+- Complete the synthetic HR Lite and Intranet Lite manual target states, then
+  run their permission/visibility checks before using either module.
 - Define users, groups, sharing policy, retention, and the Dropbox migration
   plan before importing production data.

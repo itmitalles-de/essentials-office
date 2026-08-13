@@ -69,3 +69,42 @@ keeps databases internal.
 
 **Consequences:** Any Caddy change must reconcile and validate the complete
 shared configuration before reload; PostgreSQL and Redis remain unexposed.
+
+## 2026-08-13 - Office modular contract under Essentials Plus
+
+**Decision:** The product is Office under Essentials Plus. Define optional
+modules through a versioned contract and a group-restricted Nextcloud Admin
+Center rather than a new portal service or all-in-one deployment.
+
+**Reason:** It keeps the existing Nextcloud core stable while making
+entitlements, activation health gates, and data-retention behavior explicit.
+
+**Consequences:** Administrators see the complete catalog. Users only see
+healthy, activated, group-authorized modules. Deactivation never deletes data
+or volumes. Repository/worktree names remain unchanged.
+
+## 2026-08-13 - Vaultwarden remains a private, separate small-tenant module
+
+**Decision:** Add Vaultwarden as a version-pinned optional profile with SQLite,
+no host port, private Caddy example, closed signups, separate secret/data paths,
+and a SQLite-backup/empty-target-restore procedure.
+
+**Reason:** It satisfies the web-only group-vault MVP without merging data or
+secrets into Nextcloud or exposing an unconfigured public service.
+
+**Consequences:** The profile is inactive until a private route, configuration,
+health check, and backup/restore validation are complete. Nextcloud Passwords
+and Passbolt are not used for this scope.
+
+## 2026-08-13 - Keep workflow and PBX boundaries narrow
+
+**Decision:** HR Lite uses supported Nextcloud functions with synthetic data;
+Intranet Lite uses Collectives/Teams/Dashboard/Announcement Center; Visual PBX
+remains only a disabled external contract.
+
+**Reason:** The apps lack a stable full provisioning API and the PBX proof of
+concept lacks production release gates.
+
+**Consequences:** Manual UI steps are documented and checked by target-state
+verification. No SQL hacks, standalone default wiki, PBX proxy, credentials,
+or shared data stores are introduced.

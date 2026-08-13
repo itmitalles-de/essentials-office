@@ -5,6 +5,12 @@ documented in `docs/ARCHITECTURE.md`; do not create a competing root task list.
 
 ## Now
 
+- [ ] On approved disposable infrastructure, validate Vaultwarden's private
+  Caddy route, Web Vault organization/group/role onboarding, 2FA procedure,
+  and restore using the protected matching environment file before activation.
+- [ ] Complete Office Admin Center, Intranet Lite, and HR Lite's documented
+  manual Nextcloud UI target states using fictional accounts, then run group
+  visibility and confidential-folder permission tests.
 - [ ] Review draft PR #1 (`agent/workspace-suite-iac`) in independent stages;
   validate its static checks and confirm each operational claim before merge.
 - [ ] Reconcile the complete shared Caddy file with the running configuration,
@@ -24,6 +30,9 @@ documented in `docs/ARCHITECTURE.md`; do not create a competing root task list.
   the staged order in `docs/ARCHITECTURE.md`.
 - [ ] Evaluate mailcow only as a separately operated stack on infrastructure
   that satisfies its network, DNS, resource, backup, and restore prerequisites.
+- [ ] Do not activate Visual PBX until its separate product has authentication,
+  roles, secure SIP credential storage, health checks, and clarified rights,
+  participation, and operating ownership.
 
 ## Later
 
@@ -44,3 +53,7 @@ documented in `docs/ARCHITECTURE.md`; do not create a competing root task list.
   update, health-check, and DDNS tooling on `main`.
 - [x] Recorded Workspace Suite product boundaries and staged architecture.
 - [x] Replaced the generic root handoff with this persistent task source.
+- [x] Added Office (Essentials Plus) module contract and inactive Admin Center,
+  Vaultwarden, HR Lite, Intranet Lite, and Visual PBX integration boundaries.
+- [x] Ran local static checks and isolated synthetic Vaultwarden backup/restore;
+  no NUC, DNS, Caddy, or real-account action was taken.

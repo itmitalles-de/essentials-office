@@ -1,4 +1,4 @@
-# Architecture
+# Office architecture handoff
 
 This is a concise navigation map of the implemented default-branch architecture.
 Use `README.md` for operational detail and `docs/ARCHITECTURE.md` for the
@@ -6,7 +6,9 @@ authoritative product capability map, boundaries, and staged rollout.
 
 ## Overview
 
-`main` currently contains a Compose-managed Nextcloud core for a shared NUC:
+`main` contains a Compose-managed Nextcloud core for a shared NUC. The product
+is **Office** under Essentials Plus; optional modules are defined in
+`office-modules.json` and remain independent:
 
 ```text
 public DNS / external network
@@ -33,6 +35,11 @@ host ports.
 | Shared Caddy route | Example committed; live drift/public path unresolved | `Caddyfile.example`, `README.md` |
 | Local backup/update/health | Implemented; local backup and core checks recorded tested | `scripts/` |
 | Namecheap IPv4 DDNS | Tooling implemented; recorded host timer disabled | `scripts/namecheap-ddns.sh`, `systemd/` |
+| Office Admin Center | Contract/catalog/preflight/deactivation helpers implemented; no live Collective recorded | `office-modules.json`, `docs/office/ADMIN_CENTER.md` |
+| Vaultwarden | Pinned optional profile, private Caddy example, backup/restore test implemented; inactive/unverified on NUC | `compose.vaultwarden.yaml`, `docs/office/VAULTWARDEN.md` |
+| HR Lite | Synthetic templates/reconciler/verification implemented; inactive/unverified on NUC | `hr-lite/`, `docs/office/HR_LITE.md` |
+| Intranet Lite | Optional Nextcloud-native reconciliation/manual target state implemented; inactive | `docs/office/INTRANET_LITE.md` |
+| Visual PBX | Disabled link/health contract only; no PBX service/proxy | `docs/integrations/VISUAL_PBX.md` |
 | Offsite restore automation | Proposed in draft PR #1; not on `main` | `.agent/STATE.md` |
 | Declarative apps, Collabora, Talk/TURN | Planned/proposed; not on `main` | `docs/ARCHITECTURE.md`, PR #1 |
 | mailcow | Planned separate subsystem; not implemented here | `docs/ARCHITECTURE.md` |
@@ -64,6 +71,8 @@ The backup script places Nextcloud in maintenance mode, stops cron, uses
 - Redis AOF: `/srv/nextcloud/redis`
 - Local backup output: `/srv/nextcloud/backups`
 - Host-local secrets: `/opt/nextcloud/.env`
+- Optional Vaultwarden data/backups: `/srv/vaultwarden/data`, `/srv/vaultwarden/backups`
+- Optional Vaultwarden secret file: `/opt/nextcloud/.vaultwarden.env`
 - Optional DDNS secret: `/etc/namecheap-ddns.env`
 
 Local backups do not protect against host/NVMe loss. A tested restore and
@@ -79,6 +88,10 @@ encrypted independently stored backup remain production prerequisites.
   SSO is planned only after core modules are stable.
 - mailcow, if introduced, keeps its own host/lifecycle, persistence, DNS, and
   recovery process; Nextcloud Mail connects over IMAP/SMTP.
+- Vaultwarden joins `proxy_net` only in its opt-in profile, publishes no host
+  port, uses no Nextcloud database/secret, and must remain private by default.
+- Visual PBX remains a separate product with no Office proxy, service, source
+  merge, shared database, or credentials. OIDC/SSO/groups mapping are later.
 
 ## Validation map
 
@@ -88,6 +101,10 @@ encrypted independently stored backup remain production prerequisites.
 - File persistence: `./scripts/healthcheck.sh --file-roundtrip`.
 - Recovery: follow `README.md` and test on disposable infrastructure.
 - Public readiness: verify DNS, TLS, DAV redirects, and external network path.
+- Vaultwarden profile: `tests/vaultwarden-backup-restore.sh` uses synthetic
+  data and proves startup/health/no host port/consistent backup/empty restore.
+- HR Lite: run reconciliation and verification only on an approved disposable
+  Nextcloud target; static repository checks cannot prove Forms/Tables UI state.
 
 Module-specific validation belongs with the module and cannot be inferred from
 the core health check.

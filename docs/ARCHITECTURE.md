@@ -1,41 +1,101 @@
-# Workspace Suite architecture
+# Office architecture
 
-## Ziel
+## Product and operating model
 
-Workspace Suite ist ein integriertes Produkt, aber kein einzelner untrennbarer Compose-Stack. Die Benutzeroberfläche wirkt zusammenhängend; die operativen Bausteine bleiben getrennt aktualisierbar und wiederherstellbar.
+**Office** is the Essentials Plus collaboration product. It is an integrated
+user experience, not a single inseparable Compose stack. The existing Nextcloud
+core remains the canonical file and groupware platform; optional components
+remain independently startable, updateable, backupable, and removable from the
+user interface without deleting data.
 
-| Fähigkeit | Führendes System | Betriebsform |
-| --- | --- | --- |
-| Dateien, Freigaben, Versionen | Nextcloud Files | bestehender Core auf dem NUC |
-| Kalender, Kontakte, Aufgaben | Nextcloud | Nextcloud Apps / CalDAV / CardDAV |
-| Dokumente, Tabellen, Präsentationen | Nextcloud Office + Collabora | separater Collabora-Service |
-| Chat und Meetings | Nextcloud Talk | App zuerst; TURN/HPB als eigene Stufe |
-| E-Mail-Transport und Postfächer | mailcow | separater Upstream-Stack, produktiv bevorzugt auf geeigneter VM/VPS |
-| Webmail | Nextcloud Mail | IMAP/SMTP gegen mailcow |
-| Fallback-Webmail | SOGo | von mailcow bereitgestellt, optional |
-| Persönliche Notizen | Notes | Nextcloud App |
-| Teamwissen | Collectives | Nextcloud App |
-| Kanban und Aufgabenplanung | Deck | Nextcloud App |
-| Strukturierte Listen/Formulare | Tables / Forms | Nextcloud Apps |
-| Identität/SSO | später OIDC | erst nach stabilen Kernmodulen |
+| Capability | Leading system | Operating form | Current state |
+| --- | --- | --- | --- |
+| Files, shares, versions | Nextcloud Files | existing core on the NUC | implemented core |
+| Calendar, contacts, tasks | Nextcloud | Nextcloud apps / CalDAV / CardDAV | implemented core boundary |
+| Documents, spreadsheets, presentations | Nextcloud Office + Collabora | separate Collabora service | planned optional module |
+| Chat and meetings | Nextcloud Talk | app first; TURN/HPB separate stages | planned optional module |
+| Email transport and mailboxes | mailcow | separate upstream stack/host | planned optional module |
+| Webmail | Nextcloud Mail | IMAP/SMTP against mailcow | planned optional module |
+| Fallback webmail | SOGo | supplied by mailcow, optional | planned with mailcow |
+| Intranet Lite | Collectives, Teams, Dashboard, Announcement Center | Nextcloud-native composite | contract and reconciler implemented; inactive |
+| HR Lite | Groups, Tables, Forms, Deck, Calendar, Collectives, files | limited Nextcloud workflow | contract/templates/reconciler implemented; inactive |
+| Password vault | Vaultwarden | separate optional Compose profile | overlay/backup/restore implemented; inactive |
+| Telephony | Visual PBX | separate `itmitalles-de/visual-pbx` product | disabled integration contract only |
+| Identity/SSO | OIDC | later shared architecture stage | planned |
 
-## Harte Grenzen
+## Essentials Plus module contract and Admin Center
 
-- Keine gemeinsame Datenbank zwischen Nextcloud, Collabora und mailcow.
-- Keine doppelte Kalender-/Kontakte-Hoheit in Nextcloud und SOGo.
-- Keine Produktion-Mailzustellung über eine ungeprüfte dynamische Heim-IP.
-- Kein öffentlicher Demo-Mailversand und keine echten Postfächer in Beispieldaten.
-- Kein Big-Bang-Deployment aller Komponenten.
+[`office-modules.json`](../office-modules.json) is the versioned module
+contract. Modules are grouped as Collaboration, Knowledge and intranet, People
+operations, Security and access, and External integrations. `nextcloud-core` is
+the only default-active module. Administrators see the full catalog through a
+restricted Office Admin Center Collective; ordinary users see a module only
+when it is active, healthy, and restricted to a group they belong to.
 
-## Ausbaureihenfolge
+External services must pass a configured health check before an administrator
+publishes their group-restricted link. Deactivation removes an entitlement or
+link only; it never removes data, volumes, databases, or backups. The repository
+does not contain a second portal service or automatic DNS/NUC change.
 
-1. Bestehenden Nextcloud-Core öffentlich sicher erreichbar machen, Restore und Offsite-Backup testen.
-2. Nextcloud Apps deklarativ installieren und einen Fake-Demo-Datensatz anlegen.
-3. Collabora als optionalen Service integrieren und gemeinsames Editieren testen.
-4. Talk lokal sowie extern P2P testen; danach TURN; HPB erst für belastbare Mehrparteien-Meetings.
-5. mailcow auf geeigneter Infrastruktur separat aufbauen und über Nextcloud Mail integrieren.
-6. Erst danach OIDC/SSO und ein gemeinsames Portal ergänzen.
+## Hard boundaries
 
-## Kapazitätsentscheidung
+- Preserve `/opt/nextcloud`, `/srv/nextcloud`, shared Caddy, and `proxy_net`.
+- Nextcloud, Collabora, mailcow, Vaultwarden, and Visual PBX share neither a
+  database nor secrets. mailcow remains a separate stack or host.
+- Nextcloud is canonical for calendar, contacts, and tasks. SOGo is optional
+  fallback webmail, never a second canonical groupware store.
+- Vaultwarden has a separate `/srv/vaultwarden` persistence/backup boundary;
+  its profile publishes no host port and is private by default.
+- Intranet Lite is Collectives/Teams/Dashboard/Announcement Center only;
+  Wiki.js and BookStack are not parallel default deployments.
+- HR Lite uses only synthetic data and supported OCC/WebDAV/OCS interactions;
+  no payroll, ATS, time tracking, or Nextcloud SQL manipulation.
+- Visual PBX has no service, Caddy route, public proxy, credentials, source
+  merge, or shared store in this repository. OIDC/SSO and group mapping are
+  later stages after PBX authentication, roles, SIP-secret storage, rights, and
+  health gates are independently proven.
+- No big-bang Compose deployment and no automatic major-version upgrades.
 
-Der NUC besitzt 16 GiB RAM. mailcow dokumentiert mindestens 6 GiB RAM plus Swap; Nextcloud, PostgreSQL, Redis, Collabora und Talk benötigen zusätzlich Ressourcen. Deshalb ist „alles produktiv auf einem NUC“ kein belastbarer Standard. Für Demo/Entwicklung sind selektiv aktivierte Profile möglich; für Produktion sollten Mail und gegebenenfalls TURN/HPB getrennt betrieben werden.
+## Deployment topology
+
+```text
+internet
+   |
+shared Caddy (outside this repository) ---- private, opt-in route ---- Vaultwarden :8080
+   | proxy_net                                                  (no host port)
+Nextcloud app :80
+   |                 \
+internal backend       egress
+PostgreSQL + Redis     cron
+
+Collabora / Talk / mailcow / Visual PBX: separate optional lifecycles
+```
+
+The default `compose.yaml` starts only the existing Nextcloud core. The
+Vaultwarden profile adds one container on `proxy_net`, no host port, and no
+connection to the Nextcloud backend. The Caddy route stays absent until the
+complete shared configuration is reconciled and validated.
+
+## Staged rollout
+
+1. Keep the Nextcloud core publicly secure only after Caddy/DNS/reachability,
+   offsite backup, and disposable restore prerequisites are verified.
+2. Complete the Office Admin Center and synthetic HR/Intranet manual target
+   states; test group visibility and least privilege.
+3. Run Vaultwarden's private-profile backup/restore and Caddy checks on an
+   approved disposable target before enabling any entitlement.
+4. Integrate Collabora, then Talk P2P, TURN, and HPB as separate stages.
+5. Deploy mailcow separately only on suitable infrastructure, then connect
+   Nextcloud Mail through IMAP/SMTP.
+6. Revisit Visual PBX only after its release gates; evaluate OIDC/SSO only when
+   each independently operated module is stable.
+
+## Capacity decision
+
+The NUC has 16 GiB RAM. The existing Nextcloud core is the baseline. The
+Vaultwarden SQLite profile is small but still requires protected storage,
+backups, and recovery testing. Collabora and Talk add material load; mailcow
+documents at least 6 GiB RAM plus swap. A fully active Office estate on one NUC
+is not a production default. For production, keep mail and potentially
+TURN/HPB on separate infrastructure and measure each optional module before
+activation.

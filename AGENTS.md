@@ -2,7 +2,8 @@
 
 ## Purpose and boundaries
 
-This repository deploys Workspace Suite, currently a reproducible Nextcloud core
+This repository deploys Office, the Essentials Plus collaboration product,
+currently a reproducible Nextcloud core
 for `cloud.itmitalles.de`. The repository is persistent project memory; a chat
 or agent session is temporary working memory.
 

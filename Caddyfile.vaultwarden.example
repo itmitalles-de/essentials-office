@@ -1,0 +1,16 @@
+# Optional private Vaultwarden route. It is deliberately not included by
+# Caddyfile.example and Vaultwarden publishes no Docker host port. Replace the
+# hostname with an internal DNS name that exactly matches DOMAIN in the private
+# .vaultwarden.env. Keep tls internal for private-only access; do not add a
+# public DNS record or a broad proxy route for this MVP.
+
+vault.internal.example {
+	tls internal
+
+	@private_clients remote_ip private_ranges
+	handle @private_clients {
+		reverse_proxy vaultwarden:8080
+	}
+
+	respond "not found" 404
+}
