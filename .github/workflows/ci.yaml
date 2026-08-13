@@ -21,7 +21,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
       - name: Install validation tools
-        run: sudo apt-get update && sudo apt-get install --yes jq nodejs python3-jsonschema shellcheck
+        run: sudo apt-get update && sudo apt-get install --yes jq nodejs python3-jsonschema ripgrep shellcheck
       - name: Validate Compose, schemas, templates, and source
         run: ./scripts/validate-static.sh
       - name: Validate GitHub Actions workflow
@@ -58,7 +58,7 @@ jobs:
       - name: Install disposable-test tools
         run: sudo apt-get update && sudo apt-get install --yes jq restic
       - name: Test Vaultwarden Web Vault and recovery
-        run: ./tests/vaultwarden-backup-restore.sh
+        run: sudo --preserve-env=PATH ./tests/vaultwarden-backup-restore.sh
       - name: Test isolated Collabora health
         run: ./tests/collabora-health.sh
       - name: Test Talk TURN and credential rotation
