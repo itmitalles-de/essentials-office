@@ -190,14 +190,17 @@ def run_session(
         else:
             driver.navigate(base_url + "/apps/essentialsplus/")
             wait_for(
-                lambda: driver.execute("return document.querySelectorAll('[data-module-id]').length") == len(expected_modules),
-                "ordinary user did not receive exactly the activated and entitled modules",
+                lambda: driver.execute("return Boolean(document.querySelector('.essentialsplus-portal'))"),
+                "ordinary user module portal did not load",
             )
             module_ids = driver.execute(
                 "return Array.from(document.querySelectorAll('[data-module-id]')).map((node) => node.dataset.moduleId).sort()"
             )
             if module_ids != sorted(expected_modules):
-                fail(f"ordinary user module catalog differs: {module_ids!r}")
+                fail(
+                    f"ordinary user module catalog differs: expected {sorted(expected_modules)!r}, "
+                    f"observed {module_ids!r}"
+                )
             driver.navigate(base_url + "/settings/admin/essentialsplus")
             time.sleep(1)
             if "Essentials+ Office Admin-Center" in driver.source():
