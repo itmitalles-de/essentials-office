@@ -57,7 +57,7 @@ jobs:
           chrome-version: 152.0.7977.42
           install-chromedriver: true
       - name: Install disposable-test tools
-        run: sudo apt-get update && sudo apt-get install --yes jq restic
+        run: sudo apt-get update && sudo apt-get install --yes jq restic ripgrep
       - name: Test Vaultwarden Web Vault and recovery
         env:
           CHROMIUM_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}

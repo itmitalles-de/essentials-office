@@ -290,6 +290,7 @@ final class ModuleService {
     private function applyAppVisibilityForApp(string $appId, ?array $includingModule): void {
         $groupIds = [];
         $allAuthenticated = false;
+        $platformGlobal = false;
         foreach ($this->manifests->modules() as $candidate) {
             $includedExplicitly = $includingModule !== null && $candidate['id'] === $includingModule['id'];
             if (!$includedExplicitly
@@ -297,7 +298,12 @@ final class ModuleService {
                 && !$this->stateStore->active($candidate['id'])) {
                 continue;
             }
-            if (!$this->moduleDeclaresApp($candidate, $appId)) {
+            $app = $this->moduleApp($candidate, $appId);
+            if ($app === null) {
+                continue;
+            }
+            if (($app['visibilityMode'] ?? 'module-groups') === 'platform-global') {
+                $platformGlobal = true;
                 continue;
             }
             foreach ($this->visibility($candidate) as $groupId) {
@@ -315,7 +321,7 @@ final class ModuleService {
                 $groupIds[$groupId] = $group;
             }
         }
-        if ($allAuthenticated) {
+        if ($platformGlobal || $allAuthenticated) {
             $this->appManager->enableApp($appId);
             return;
         }
@@ -331,6 +337,12 @@ final class ModuleService {
         foreach ($module['nextcloudApps'] as $app) {
             if ($this->appRequiredByAnotherActiveModule($app['id'], $module['id'])) {
                 $this->applyAppVisibilityForApp($app['id'], null);
+            } elseif (($app['visibilityMode'] ?? 'module-groups') === 'platform-global') {
+                // Nextcloud forbids group restriction for protected platform
+                // app types such as Teams/circles. Logical module visibility
+                // and content ACLs remain restricted; deactivation must not
+                // disable or delete the shared platform capability.
+                continue;
             } elseif ($this->appManager->isEnabledForAnyone($app['id'])) {
                 $this->appManager->disableApp($app['id']);
             }
@@ -362,13 +374,16 @@ final class ModuleService {
     }
 
     /** @param array<string, mixed> $module */
-    private function moduleDeclaresApp(array $module, string $appId): bool {
+    /** @param array<string, mixed> $module
+     *  @return array<string, mixed>|null
+     */
+    private function moduleApp(array $module, string $appId): ?array {
         foreach ($module['nextcloudApps'] as $app) {
             if ($app['id'] === $appId) {
-                return true;
+                return $app;
             }
         }
-        return false;
+        return null;
     }
 
     private function parseBoolean(string $value): bool {

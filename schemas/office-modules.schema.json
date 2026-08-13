@@ -231,7 +231,11 @@
         "required": {"type": "boolean"},
         "source": {"enum": ["shipped", "app-store", "repository"]},
         "minVersion": {"type": "string"},
-        "maxExclusive": {"type": "string"}
+        "maxExclusive": {"type": "string"},
+        "visibilityMode": {
+          "enum": ["module-groups", "platform-global"],
+          "default": "module-groups"
+        }
       }
     },
     "lifecycleBoundary": {

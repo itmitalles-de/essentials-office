@@ -61,6 +61,12 @@ jq -e '
   ([.modules[] | .deactivation.deletesData] | all(. == false)) and
   ([.modules[] | .deactivation.stopsService] | all(. == false)) and
   ([.modules[] | .activation.hostControl] | all(. == false)) and
+  ([.modules[] | select(.id == "intranet-lite") | .nextcloudApps[] |
+    select(.visibilityMode == "platform-global") | .id] | sort) ==
+    (["announcementcenter", "circles", "collectives", "forms"] | sort) and
+  ([.modules[] | select(.id == "hr-lite") | .nextcloudApps[] |
+    select(.visibilityMode == "platform-global") | .id] | sort) ==
+    (["collectives", "forms"] | sort) and
   ([.modules[] | select(.id == "vaultwarden") | .composeServices] == [["vaultwarden"]]) and
   ([.modules[] | select(.id == "essentials-calls") | .externalServices[0].repository] == ["itmitalles-de/visual-pbx"])
 ' "$CONTRACT" >/dev/null || die 'module contract violates an Essentials+ Office invariant'

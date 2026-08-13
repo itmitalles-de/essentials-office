@@ -492,7 +492,10 @@ run_module_control_tests() {
   occ essentialsplus:module:disable essentials-calls >/dev/null || die 'Essentials+ Calls logical disable command failed'
 
   if [ "$WITH_INTRANET" = true ]; then
-    state=$(occ essentialsplus:module:enable intranet-lite) || die 'Intranet Lite enable command failed'
+    if ! state=$(occ essentialsplus:module:enable intranet-lite); then
+      printf '%s\n' "$state" >&2
+      die 'Intranet Lite enable command failed'
+    fi
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Intranet Lite activation failed'
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,intranet-lite"
   fi
@@ -509,7 +512,7 @@ run_module_control_tests() {
   fi
 
   if [ "$WITH_HR" = true ] && [ "$WITH_INTRANET" = true ]; then
-    enabled_groups=$(occ config:app:get forms enabled) || die 'shared Forms visibility query failed'
+    enabled_groups=$(occ config:app:get tables enabled) || die 'shared Tables visibility query failed'
     jq -e 'sort == ["employee", "hr-admin", "intranet-editor", "manager"]' <<<"$enabled_groups" >/dev/null ||
       die 'shared app group visibility is not the union of active modules'
   fi

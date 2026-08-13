@@ -89,11 +89,11 @@
       "groups": {"default": ["intranet-editor", "employee"], "allowed": ["intranet-editor", "employee", "manager"], "autoCreate": true},
       "roles": ["admin", "editor", "reader"],
       "nextcloudApps": [
-        {"id": "collectives", "required": true, "source": "app-store", "minVersion": "4.0.0", "maxExclusive": "5.0.0"},
-        {"id": "circles", "required": true, "source": "shipped", "minVersion": "34.0.0", "maxExclusive": "35.0.0"},
+        {"id": "collectives", "required": true, "source": "app-store", "minVersion": "4.0.0", "maxExclusive": "5.0.0", "visibilityMode": "platform-global"},
+        {"id": "circles", "required": true, "source": "shipped", "minVersion": "34.0.0", "maxExclusive": "35.0.0", "visibilityMode": "platform-global"},
         {"id": "dashboard", "required": true, "source": "shipped", "minVersion": "7.0.0", "maxExclusive": "9.0.0"},
-        {"id": "announcementcenter", "required": true, "source": "app-store", "minVersion": "7.0.0", "maxExclusive": "9.0.0"},
-        {"id": "forms", "required": true, "source": "app-store", "minVersion": "5.0.0", "maxExclusive": "6.0.0"},
+        {"id": "announcementcenter", "required": true, "source": "app-store", "minVersion": "7.0.0", "maxExclusive": "9.0.0", "visibilityMode": "platform-global"},
+        {"id": "forms", "required": true, "source": "app-store", "minVersion": "5.0.0", "maxExclusive": "6.0.0", "visibilityMode": "platform-global"},
         {"id": "tables", "required": true, "source": "app-store", "minVersion": "2.0.0", "maxExclusive": "3.0.0"},
         {"id": "deck", "required": true, "source": "app-store", "minVersion": "1.0.0", "maxExclusive": "2.0.0"}
       ],
@@ -262,10 +262,10 @@
       "roles": ["hr-admin", "manager", "employee"],
       "nextcloudApps": [
         {"id": "tables", "required": true, "source": "app-store", "minVersion": "2.0.0", "maxExclusive": "3.0.0"},
-        {"id": "forms", "required": true, "source": "app-store", "minVersion": "5.0.0", "maxExclusive": "6.0.0"},
+        {"id": "forms", "required": true, "source": "app-store", "minVersion": "5.0.0", "maxExclusive": "6.0.0", "visibilityMode": "platform-global"},
         {"id": "deck", "required": true, "source": "app-store", "minVersion": "1.0.0", "maxExclusive": "2.0.0"},
         {"id": "calendar", "required": true, "source": "app-store", "minVersion": "6.0.0", "maxExclusive": "8.0.0"},
-        {"id": "collectives", "required": true, "source": "app-store", "minVersion": "4.0.0", "maxExclusive": "5.0.0"}
+        {"id": "collectives", "required": true, "source": "app-store", "minVersion": "4.0.0", "maxExclusive": "5.0.0", "visibilityMode": "platform-global"}
       ],
       "composeServices": [],
       "externalServices": [],
