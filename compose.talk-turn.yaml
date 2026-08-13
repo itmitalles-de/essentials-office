@@ -1,0 +1,35 @@
+services:
+  app:
+    volumes:
+      # The application reads this only during the controlled configuration
+      # script. The secret never appears in OCC arguments or logs.
+      - ${TURN_SECRET_FILE:-/etc/nextcloud/talk-turn.secret}:/run/secrets/talk-turn-shared:ro
+
+  turn:
+    image: coturn/coturn:4.17.2-r0@sha256:aa68aab64a3b929d57fc2924c98ea447bf996cf8dade2508e7b71eaf23f1f14e
+    container_name: ${TURN_CONTAINER_NAME:-nextcloud-turn}
+    profiles:
+      - talk-turn
+    restart: unless-stopped
+    stop_grace_period: 30s
+    # The generated config is root-owned and group-readable only by this
+    # explicit unprivileged container identity.
+    user: "65534:${TURN_RUNTIME_GID:-65534}"
+    network_mode: host
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+    volumes:
+      - ${TURN_CONFIG_FILE:-/etc/nextcloud/turnserver.conf}:/etc/coturn/turnserver.conf:ro
+    tmpfs:
+      - /var/lib/coturn:size=16m,mode=0700
+      - /tmp:size=16m,mode=1777
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_stunclient -p 3478 127.0.0.1 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s

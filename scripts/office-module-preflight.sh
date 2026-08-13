@@ -2,8 +2,8 @@
 # Validate an Office module before an administrator makes it visible to users.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 CONTRACT=${OFFICE_MODULE_CONTRACT:-"$PROJECT_DIR/office-modules.json"}
 CONFIG=${OFFICE_MODULE_CONFIG:-"$PROJECT_DIR/config/office-modules.env"}
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}

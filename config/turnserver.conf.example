@@ -1,0 +1,18 @@
+# Rendered by scripts/install-talk-turn-config.sh. Never put the real secret here.
+listening-port=3478
+fingerprint
+use-auth-secret
+static-auth-secret=@TURN_SECRET@
+realm=@TURN_REALM@
+external-ip=@TURN_EXTERNAL_IP@
+min-port=49160
+max-port=49200
+total-quota=0
+bps-capacity=0
+stale-nonce
+no-multicast-peers
+no-cli
+no-tls
+no-dtls
+log-file=stdout
+simple-log

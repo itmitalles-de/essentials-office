@@ -2,10 +2,11 @@
 # Validate the local stack and its public Caddy endpoint without printing secrets.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-DOMAIN=cloud.itmitalles.de
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+DOMAIN=
 RUN_ROUNDTRIP=false
+CORE_ONLY=false
 
 die() {
   printf 'healthcheck: %s\n' "$*" >&2
@@ -33,7 +34,9 @@ roundtrip_file() {
   local admin password netrc source download remote_id remote_path
   admin=$(env_value NEXTCLOUD_ADMIN_USER)
   password=$(env_value NEXTCLOUD_ADMIN_PASSWORD)
-  [ -n "$admin" ] && [ -n "$password" ] || die 'admin credentials are missing from .env'
+  if [ -z "$admin" ] || [ -z "$password" ]; then
+    die 'admin credentials are missing from .env'
+  fi
 
   netrc=$(mktemp)
   source=$(mktemp)
@@ -67,14 +70,26 @@ roundtrip_file() {
 
 case "${1:-}" in
   '') ;;
+  --core-only) CORE_ONLY=true ;;
   --file-roundtrip) RUN_ROUNDTRIP=true ;;
-  *) die 'usage: healthcheck.sh [--file-roundtrip]' ;;
+  *) die 'usage: healthcheck.sh [--core-only|--file-roundtrip]' ;;
 esac
+[ "$#" -le 1 ] || die 'usage: healthcheck.sh [--core-only|--file-roundtrip]'
 
-for command in awk cmp curl docker grep openssl; do
+required_commands=(awk docker grep)
+if [ "$CORE_ONLY" = false ]; then
+  required_commands+=(curl openssl)
+fi
+if [ "$RUN_ROUNDTRIP" = true ]; then
+  required_commands+=(cmp)
+fi
+for command in "${required_commands[@]}"; do
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
 done
 [ -f "$PROJECT_DIR/.env" ] || die 'missing .env; run bootstrap.sh first'
+DOMAIN=$(env_value NEXTCLOUD_PUBLIC_HOST)
+[ -n "$DOMAIN" ] || DOMAIN=$(env_value NEXTCLOUD_TRUSTED_DOMAINS | awk '{print $1}')
+[ -n "$DOMAIN" ] || die 'could not determine the Nextcloud public hostname from .env'
 cd "$PROJECT_DIR"
 docker compose config -q
 
@@ -84,12 +99,18 @@ done
 docker compose ps
 
 docker compose exec -T db sh -ec 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null || die 'PostgreSQL is not ready'
-docker compose exec -T redis sh -ec 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping | grep -qx PONG' || die 'Redis did not answer PONG'
+docker compose exec -T redis sh -ec 'REDISCLI_AUTH="$REDIS_PASSWORD" exec redis-cli --no-auth-warning ping' | grep -qx PONG ||
+  die 'Redis did not answer PONG'
 
 occ_status=$(docker compose exec -T -u www-data app php occ status --output=json)
 printf '%s\n' "$occ_status" | grep -Eq '"installed"[[:space:]]*:[[:space:]]*true' || die 'Nextcloud is not installed'
 printf '%s\n' "$occ_status" | grep -Eq '"maintenance"[[:space:]]*:[[:space:]]*false' || die 'Nextcloud is in maintenance mode'
 docker compose exec -T -u www-data app php occ config:app:get core backgroundjobs_mode | grep -Fxq cron || die 'Nextcloud background mode is not cron'
+
+if [ "$CORE_ONLY" = true ]; then
+  printf 'healthcheck: internal core checks passed\n'
+  exit 0
+fi
 
 local_status=$(curl --fail --silent --show-error --insecure --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/status.php") || die 'Caddy does not reach Nextcloud status.php'
 printf '%s\n' "$local_status" | grep -Eq '"installed"[[:space:]]*:[[:space:]]*true' || die 'Caddy status response is not installed'

@@ -3,7 +3,7 @@ name: nextcloud
 services:
   db:
     image: postgres:17-alpine
-    container_name: nextcloud-db
+    container_name: ${DB_CONTAINER_NAME:-nextcloud-db}
     restart: unless-stopped
     stop_grace_period: 1m
     environment:
@@ -13,7 +13,7 @@ services:
       POSTGRES_INITDB_ARGS: --data-checksums
       TZ: ${TZ:-Europe/Berlin}
     volumes:
-      - /srv/nextcloud/postgres:/var/lib/postgresql/data
+      - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/postgres:/var/lib/postgresql/data
     networks:
       - backend
     healthcheck:
@@ -25,7 +25,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: nextcloud-redis
+    container_name: ${REDIS_CONTAINER_NAME:-nextcloud-redis}
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
@@ -34,13 +34,19 @@ services:
     command:
       - /bin/sh
       - -ec
-      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+      - |
+        umask 077
+        printf 'appendonly yes\nrequirepass %s\n' "$$REDIS_PASSWORD" > /run/redis/redis.conf
+        chown redis:redis /run/redis /run/redis/redis.conf
+        exec /usr/bin/setpriv --reuid redis --regid redis --clear-groups redis-server /run/redis/redis.conf
+    tmpfs:
+      - /run/redis:size=1m,mode=0700
     volumes:
-      - /srv/nextcloud/redis:/data
+      - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/redis:/data
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -qx PONG"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli --no-auth-warning ping | grep -qx PONG"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -48,7 +54,7 @@ services:
 
   app:
     image: nextcloud:34-apache
-    container_name: nextcloud-app
+    container_name: ${APP_CONTAINER_NAME:-nextcloud-app}
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:
@@ -77,8 +83,8 @@ services:
       APACHE_BODY_LIMIT: "10737418240"
       TZ: ${TZ:-Europe/Berlin}
     volumes:
-      - /srv/nextcloud/html:/var/www/html
-      - /srv/nextcloud/data:/var/www/html/data
+      - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/html:/var/www/html
+      - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/data:/var/www/html/data
     networks:
       backend:
       egress:
@@ -94,7 +100,7 @@ services:
 
   cron:
     image: nextcloud:34-apache
-    container_name: nextcloud-cron
+    container_name: ${CRON_CONTAINER_NAME:-nextcloud-cron}
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:
@@ -120,8 +126,8 @@ services:
       APACHE_BODY_LIMIT: "10737418240"
       TZ: ${TZ:-Europe/Berlin}
     volumes:
-      - /srv/nextcloud/html:/var/www/html
-      - /srv/nextcloud/data:/var/www/html/data
+      - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/html:/var/www/html
+      - ${NEXTCLOUD_DATA_ROOT:-/srv/nextcloud}/data:/var/www/html/data
     networks:
       backend:
       egress:

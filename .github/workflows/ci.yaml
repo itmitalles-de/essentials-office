@@ -3,35 +3,93 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  static:
-    runs-on: ubuntu-24.04
+  static-validation:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Prepare non-secret Compose environment
-        run: |
-          set -eu
-          cp .env.example /tmp/nextcloud-ci.env
-          sed -i \
-            -e 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=ci-postgres-password/' \
-            -e 's/^NEXTCLOUD_ADMIN_PASSWORD=$/NEXTCLOUD_ADMIN_PASSWORD=ci-nextcloud-password/' \
-            -e 's/^REDIS_PASSWORD=$/REDIS_PASSWORD=ci-redis-password/' \
-            /tmp/nextcloud-ci.env
-      - name: Validate base and Vaultwarden Compose files
-        run: |
-          set -eu
-          docker compose --env-file /tmp/nextcloud-ci.env config -q
-          VAULTWARDEN_ENV_FILE="$GITHUB_WORKSPACE/vaultwarden.env.example" \
-            docker compose --env-file /tmp/nextcloud-ci.env \
-              -f compose.yaml -f compose.vaultwarden.yaml --profile vaultwarden config -q
-      - name: Check shell syntax
-        run: bash -n scripts/*.sh tests/*.sh
-      - name: Check module contract
-        run: ./tests/office-modules-contract.sh
-      - name: Scan tracked implementation files for obvious secrets
-        run: ./scripts/check-secrets.sh --tracked
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install --yes jq nodejs python3-jsonschema ripgrep
+      - name: Validate Compose, schemas, templates, and source
+        run: ./scripts/validate-static.sh
+      - name: Validate GitHub Actions workflow
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/repo:ro"
+          --workdir /repo
+          rhysd/actionlint:1.7.7@sha256:1d74bfc9fd1963af8f89a7c22afaaafd42f49aad711a09951d02cb996398f61d
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Scan Git history with Gitleaks
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git --redact --no-banner /repo
+
+  isolated-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Install Chromium and matching ChromeDriver
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd # v2.1.2
+        with:
+          chrome-version: 152.0.7977.42
+          install-chromedriver: true
+      - name: Install disposable-test tools
+        run: sudo apt-get update && sudo apt-get install --yes jq restic ripgrep
+      - name: Test Vaultwarden Web Vault and recovery
+        env:
+          CHROMIUM_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROMEDRIVER_BIN: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: sudo --preserve-env=CHROMIUM_BIN,CHROMEDRIVER_BIN ./tests/vaultwarden-backup-restore.sh
+      - name: Test isolated Collabora health
+        run: ./tests/collabora-health.sh
+      - name: Test Talk TURN and credential rotation
+        run: ./tests/talk-turn.sh
+      - name: Test Mail and Essentials+ Calls contracts
+        run: ./tests/external-contracts.sh
+
+  disposable-office:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Install Chromium and matching ChromeDriver
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd # v2.1.2
+        with:
+          chrome-version: 152.0.7977.42
+          install-chromedriver: true
+      - name: Install recovery tools
+        run: sudo apt-get update && sudo apt-get install --yes jq restic ripgrep rsync
+      - name: Test clean deployment, modules, browser, and recovery
+        env:
+          CHROMIUM_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROMEDRIVER_BIN: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: sudo --preserve-env=CHROMIUM_BIN,CHROMEDRIVER_BIN,GITHUB_ACTIONS,GITHUB_WORKSPACE ./tests/deploy/run.sh --browser --recovery --hr --intranet --talk
+
+  # Real DNS, Caddy, Internet ingress, NUC resources, TLS, offsite storage,
+  # mail delivery, NAT media quality, and production use remain explicit external
+  # gates. CI never reaches or mutates those systems.

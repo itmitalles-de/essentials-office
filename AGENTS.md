@@ -2,7 +2,7 @@
 
 ## Purpose and boundaries
 
-This repository deploys Office, the Essentials Plus collaboration product,
+This repository deploys **Essentials+ Office**, the Essentials Plus collaboration product,
 currently a reproducible Nextcloud core
 for `cloud.itmitalles.de`. The repository is persistent project memory; a chat
 or agent session is temporary working memory.

@@ -1,14 +1,14 @@
-# Office
+# Workspace Suite
 
-**Office** is the Essentials Plus collaboration product: an open-source,
-self-hosted alternative to Microsoft 365 / Google Workspace. The existing
-Nextcloud foundation remains at `https://cloud.itmitalles.de`; this repository
-grows around it without replacing it. The repository name and working paths do
-not change as part of this work.
+Open-source collaboration platform and self-hosted alternative to Microsoft 365 / Google Workspace. The existing production-grade Nextcloud foundation is deployed at `https://cloud.itmitalles.de`; the repository grows around that foundation without replacing it.
+
+
+
+> **Main product 3 of 3.** The product name is **Workspace Suite**. The public Nextcloud hostname remains `cloud.itmitalles.de`; the repository should later be renamed administratively to `itmitalles-de/workspace-suite`.
 
 ## Product scope
 
-Office is composed of independently operable modules:
+Workspace Suite is composed of independently operable modules:
 
 - Nextcloud Files, sharing, versions and sync
 - Calendar, Contacts and Tasks as the canonical groupware data store
@@ -16,25 +16,17 @@ Office is composed of independently operable modules:
 - Nextcloud Office with a dedicated Collabora Online container for browser-based documents, spreadsheets and presentations
 - Nextcloud Mail connected to mailcow over IMAP/SMTP
 - Notes for personal notes, Collectives for shared knowledge, Deck for Kanban, plus Tables and Forms
-- Intranet Lite as an optional Nextcloud-native composition of Collectives,
-  Teams, Dashboard, and Announcement Center; Wiki.js and BookStack are not
-  parallel default services
-- Vaultwarden as an optional, private password vault for organisations,
-  collections, roles, and groups; it keeps its own SQLite data, backups, and
-  secrets
-- HR Lite as a strictly limited, synthetic Nextcloud workflow using groups,
-  Tables, Forms, Deck, Calendar, Collectives, and protected files
-- Visual PBX only as a disabled external-integration contract; the PBX product,
-  source code, database, secrets, and proxy stay separate
 - mailcow as an independently managed mail subsystem; SOGo is an optional fallback webmail, not a second canonical calendar/contact system
 - centralized OIDC/SSO only after the core modules are stable
 
-The current NUC deployment contains only the validated Nextcloud core. The
-Vaultwarden overlay and Office module contracts are implemented in this
-repository but are deliberately inactive and unverified on the NUC. Collabora,
-Talk infrastructure, mailcow, Intranet Lite, HR Lite, and Visual PBX activation
-remain separate stages. mailcow must not be pasted into the Nextcloud Compose
-file: it has its own lifecycle, ports, DNS, backups and substantial memory
+The current NUC deployment contains only the validated Nextcloud core. This
+repository now defines declarative apps, an optional dedicated Collabora
+overlay, an optional coturn overlay, encrypted offsite backup automation, and
+an isolated restore test. These additions are disabled until their documented
+gates pass; their presence in Git does not mean they are deployed. The Talk
+high-performance backend remains a later stage. mailcow remains a separately
+pinned upstream project and must not be pasted into the Nextcloud Compose file:
+it has its own lifecycle, ports, DNS, backups and substantial memory
 requirements. A production mail system should use infrastructure with a static
 address and controllable PTR/rDNS rather than relying on a residential dynamic
 connection.
@@ -63,6 +55,34 @@ Status verified on 2026-08-12:
   before its existing configuration is reloaded.
 - Local backups exist on the same NVMe. A tested restore plus encrypted offsite
   backup remain mandatory before production data is migrated.
+- A 2026-08-13 follow-up authenticated to the NUC, confirmed that public DNS
+  still has no `cloud` A/AAAA record, proved Caddy disk/runtime equivalence,
+  measured the core, and restored a fresh live backup on isolated disposable
+  infrastructure. See [NUC baseline and validation gate](docs/operations/NUC_BASELINE.md).
+
+## Reproducible operations
+
+The base stack remains `compose.yaml`. Optional capabilities are independent:
+
+| Capability | Artifact | Default |
+| --- | --- | --- |
+| Idempotent core/app deployment | `scripts/deploy.sh --apps` | explicit |
+| Encrypted offsite backup | `scripts/offsite-backup.sh` | not scheduled |
+| Disposable restore | `scripts/restore-test.sh` | run on demand |
+| Declared Nextcloud apps | `scripts/reconcile-apps.sh` | no implicit mutation |
+| Dedicated Collabora | `compose.collabora.yaml`, profile `office` | off |
+| coturn | `compose.talk-turn.yaml`, profile `talk-turn` | off |
+| mailcow | separate upstream checkout pinned by `mailcow/UPSTREAM_COMMIT` | not installed |
+
+Operational runbooks:
+
+- [IaC deployment](docs/operations/IAC_DEPLOYMENT.md)
+- [Backup and restore](docs/operations/BACKUP_RESTORE.md)
+- [Nextcloud apps](docs/operations/NEXTCLOUD_APPS.md)
+- [Collabora](docs/operations/COLLABORA.md)
+- [Talk and TURN](docs/operations/TALK.md)
+- [mailcow boundary](mailcow/README.md)
+- [Fictitious end-to-end demo](docs/operations/DEMO_FLOW.md)
 
 ## Architecture
 
@@ -98,71 +118,11 @@ All persistent service state is below `/srv/nextcloud`:
 └── backups/    local backup archives
 ```
 
-## Office modules and Admin Center
-
-Office uses a versioned Essentials Plus module contract in
-[`office-modules.json`](office-modules.json), with a locally ignored activation
-file derived from
-[`config/office-modules.env.example`](config/office-modules.env.example). The
-only default-active module is the existing Nextcloud core. All optional modules
-start inactive; normal users must see a module only after it is both healthy and
-enabled for an entitled group. Administrators see the full grouped catalog in a
-restricted **Office Admin Center** Collective.
-
-| Theme | Optional modules |
-| --- | --- |
-| Collaboration | Collabora, Talk, Mail |
-| Knowledge and intranet | Intranet Lite |
-| People operations | HR Lite |
-| Security and access | Vaultwarden |
-| External integrations | Visual PBX |
-
-The detailed visibility contract and manual Nextcloud setup are in
-[`docs/office/ADMIN_CENTER.md`](docs/office/ADMIN_CENTER.md). Activating a
-module requires its configuration plus a successful module preflight; disabling
-it removes no data, databases, backups, or volumes.
-
-### Optional Vaultwarden
-
-Vaultwarden is a separate `vaultwarden` Compose profile in
-[`compose.vaultwarden.yaml`](compose.vaultwarden.yaml), pinned to the official
-upstream stable release `1.37.1` checked on 2026-08-13. It publishes no host
-port, uses a private Caddy route only when an administrator deliberately adds
-[`Caddyfile.vaultwarden.example`](Caddyfile.vaultwarden.example), closes
-registration by default, and stores its SQLite data under `/srv/vaultwarden`.
-It must not be made public in this MVP.
-
-The bootstrap, health check, consistent SQLite backup, empty-target restore,
-update, rollback, 2FA, and organisation procedures are documented in
-[`docs/office/VAULTWARDEN.md`](docs/office/VAULTWARDEN.md). Vaultwarden backups
-and the protected `.vaultwarden.env` must be independently encrypted and kept
-offsite; they are not part of a Nextcloud backup.
-
-### Optional HR Lite and Intranet Lite
-
-HR Lite has fictional-only groups (`hr-admin`, `manager`, `employee`), a
-reconciler, an entitlement/permission verifier, and templates for onboarding,
-offboarding, absence status, responsibilities, and confidential documents.
-Forms, Tables, Deck, Calendar, and Collectives lack a stable complete
-provisioning API, so their minimal manual target state is documented rather
-than implemented through SQL or fragile hacks. See
-[`docs/office/HR_LITE.md`](docs/office/HR_LITE.md).
-
-Intranet Lite is optional and deliberately stays within Collectives, Teams,
-Dashboard, and Announcement Center. Its activation and manual target state are
-in [`docs/office/INTRANET_LITE.md`](docs/office/INTRANET_LITE.md). Neither it
-nor Office installs Wiki.js or BookStack as a parallel default service.
-
-### Optional Visual PBX link
-
-Visual PBX remains a separately operated product. Office carries only an
-inactive, credential-free portal/health contract and does not proxy, expose, or
-merge the PBX proof of concept. The mandatory release gates and health check are
-in [`docs/integrations/VISUAL_PBX.md`](docs/integrations/VISUAL_PBX.md).
-
 ## Prerequisites
 
-- Ubuntu host with Docker Engine and Docker Compose v2.
+- Ubuntu host. `scripts/provision-host.sh` installs Docker Engine, Docker
+  Compose v2, and the required base tools from the official Docker apt
+  repository; `--check` validates an existing host without mutation.
 - A shared external Docker network named `proxy_net`, or no network with that
   name. `bootstrap.sh` creates it only when absent.
 - Shared Caddy connected to that network and owning host ports 80 and 443.
@@ -177,29 +137,31 @@ another proxy and never publishes a Nextcloud application host port.
 
 ## Installation
 
-Clone this repository on the NUC at `/opt/nextcloud`, then run the bootstrap.
-The bootstrap validates prerequisites, pulls the three declared images if they
-are absent (to obtain their actual service UIDs), creates `/srv/nextcloud`,
-generates cryptographically strong secrets in `.env`, creates `proxy_net` only
-if needed, determines its actual CIDR, and validates `docker compose config`.
-It never replaces an existing `.env` or changes a non-empty data directory.
+Clone this repository on the NUC at `/opt/nextcloud`, provision the host when
+needed, and apply the repository state. The deployment command bootstraps the
+host directories and local `.env`, validates Compose, starts the core, waits
+for health, enables cron mode, and optionally reconciles all declared apps. It
+never replaces an existing `.env` or changes ownership of a non-empty data
+directory.
 
 ```bash
 sudo install -d -m 0755 -o "$USER" -g "$USER" /opt/nextcloud
 git clone https://github.com/itmitalles-de/cloud.itmitalles.de.git /opt/nextcloud
 cd /opt/nextcloud
-./scripts/bootstrap.sh
+sudo ./scripts/provision-host.sh
+sudo ./scripts/deploy.sh --apps
 ```
 
-After DNS and Caddy are in place, start the services and set the supported
-background-job mode to cron:
+The internal deploy succeeds without public DNS or Caddy. After DNS and the
+separately managed Caddy route are in place, run the external checks:
 
 ```bash
-cd /opt/nextcloud
-docker compose up -d
-docker compose exec -T -u www-data app php occ background:cron
 ./scripts/healthcheck.sh --file-roundtrip
 ```
+
+Use `sudo ./tests/deploy/run.sh --apps` to prove a clean deployment, all apps,
+restart persistence, and a second idempotent deployment with unique temporary
+paths and containers. See the [IaC runbook](docs/operations/IAC_DEPLOYMENT.md).
 
 The initial administrator account and its generated password are in the
 NUC-local `/opt/nextcloud/.env` (mode `0600`), never in Git. Store an encrypted
@@ -308,15 +270,23 @@ sudo ./scripts/backup.sh
 
 The script takes an exclusive lock, enables maintenance mode, creates a
 consistent PostgreSQL custom-format dump, archives the persistent Nextcloud
-filesystem (`html`, `data`, and `redis`), stores a resolved but secret-redacted
+filesystem (`html` and `data`), stores a resolved but secret-redacted
 Compose configuration, and reliably disables maintenance mode even when a
 command fails. It intentionally does **not** copy the live PostgreSQL data
-directory: the logical `pg_dump` is the consistent database backup.
+directory: the logical `pg_dump` is the consistent database backup. Redis is
+also not restored from a stale AOF; it is cache/locking/session state and is
+recreated empty during disaster recovery. PostgreSQL object owners and ACLs are
+retained because Nextcloud 34 can use a dedicated application database role.
 
-The default target is `/srv/nextcloud/backups`. This is convenient for local
+The default target is `<NEXTCLOUD_DATA_ROOT>/backups` (production:
+`/srv/nextcloud/backups`). This is convenient for local
 recovery only; it does not protect against NVMe failure, theft, fire, or a
 destructive host incident. External, encrypted, tested offsite backups are a
 required follow-up before treating the service as production-safe.
+`scripts/offsite-backup.sh` implements that follow-up with restic, root-only
+repository/password files, and a post-upload repository check. The live `.env`
+is included only inside restic's encrypted snapshot. See the backup runbook for
+setup and the isolated restore test.
 
 ### Restore and disaster recovery order
 
@@ -325,11 +295,13 @@ required follow-up before treating the service as production-safe.
 2. Restore the protected `/opt/nextcloud/.env` from secret management with mode
    `0600`; use the committed `compose.yaml` from the same backup/repository
    revision.
-3. Recreate `proxy_net`, restore `html`, `data`, and `redis` to
-   `/srv/nextcloud`, and recreate the empty `/srv/nextcloud/postgres` directory
-   with the UID/GID expected by the PostgreSQL image.
-4. Start only `db`, then restore `nextcloud.pg.dump` with `pg_restore` as the
-   `nextcloud` database user. Do not overwrite a populated database blindly.
+3. Recreate `proxy_net`, restore `html` and `data` to `/srv/nextcloud`, and
+   recreate empty `/srv/nextcloud/postgres` and `/srv/nextcloud/redis`
+   directories with the UID/GID expected by their images.
+4. Start only `db`, recreate the application database login from the protected
+   `config.php` without logging its password, then restore `nextcloud.pg.dump`
+   with `pg_restore` as the administrative database user. Preserve dump owners
+   and ACLs; do not overwrite a populated database blindly.
 5. Start `redis`, `app`, and `cron`; run `php occ maintenance:repair` only after
    inspecting `occ status` and the restore logs.
 6. Set background jobs to cron, enable Caddy only after `occ status` is healthy,
@@ -360,6 +332,15 @@ tested restore point and maintenance window.
 
 ## Validation checklist
 
+GitHub Actions runs only repository-safe checks: base and overlay Compose
+rendering, recursive Bash syntax, ShellCheck, and a full-history Gitleaks scan.
+It deliberately does not simulate the NUC, Caddy, public DNS/TLS, WebDAV,
+Collabora, TURN, or restore. Run the same static checks locally with:
+
+```bash
+./scripts/validate-static.sh
+```
+
 `healthcheck.sh` verifies running containers, Compose status, PostgreSQL,
 Redis, installed/non-maintenance `occ` status, cron mode, public and Caddy-local
 `status.php`, the public certificate, WebDAV response, and CardDAV/CalDAV
@@ -379,15 +360,6 @@ Before production use, also verify:
 - `docker ps` and `ss -ltnp` show no public PostgreSQL or Redis port.
 - The Nextcloud Administration overview has no unresolved security or setup
   warning that is relevant to this deployment.
-- The optional Vaultwarden profile has passed
-  `tests/vaultwarden-backup-restore.sh` with synthetic data, then its own
-  disposable-host restore and private Caddy test before it is exposed to users.
-- A module's `office-module-preflight.sh` succeeds before its entitlement/link
-  is published, and an unentitled test user cannot see the app or link.
-- HR Lite's `hr-lite-verify.sh --url ...` passes after its manual Forms,
-  Tables, Deck, Calendar, and Collectives target state is completed.
-- `visual-pbx-contract-check.sh` still reports the integration disabled unless
-  all separately documented PBX release gates and health check are complete.
 
 ## Security model
 
@@ -403,14 +375,6 @@ Before production use, also verify:
   HTTPS URL and reverse-proxy headers.
 - Container images are pinned to deliberate major versions. Patch/minor tags
   remain floating by design and are updated by the controlled script.
-- Vaultwarden is an independent optional profile with closed signups, no host
-  port, a private-only Caddy example, separate secret file, separate SQLite
-  backup/restore path, and no shared Nextcloud database or secrets.
-- Office never treats a configured external URL as an entitlement: configured
-  service health and group restriction are mandatory before a user-facing link.
-- Visual PBX is an inactive integration contract only. Office does not publicly
-  proxy its proof of concept, share SIP credentials, or claim authentication,
-  role, or rights controls that have not been proven in the PBX product.
 
 ## Troubleshooting
 
@@ -432,17 +396,21 @@ Before production use, also verify:
 
 ## Open operational items
 
+- Authenticate to the actual NUC and create a fresh read-only inventory; do not
+  reload Caddy until its disk/runtime result is `match`.
 - Enable Namecheap Dynamic DNS and create the `cloud` A + Dynamic DNS record,
   then enter its per-domain password locally on the NUC.
 - Verify from a genuinely external network whether the Netgear router has a
   forwardable public IPv4 and whether TCP 80/443 reach Caddy. If it does not,
   choose a DNS provider with dynamic `AAAA` support and verify the IPv6 path.
 - Reconcile any existing Caddy configuration drift before reloading it.
-- Put encrypted backups and the generated `.env` into independently stored,
-  offsite backup/secret management, then test a restore.
-- On an approved disposable host, configure and test the optional Vaultwarden
-  profile and its private Caddy route before any Office entitlement is enabled.
-- Complete the synthetic HR Lite and Intranet Lite manual target states, then
-  run their permission/visibility checks before using either module.
+- Before any real personal, customer, or mail data is stored: configure the
+  Google Drive/restic target, upload the generated `.env` only through the
+  encrypted snapshot, and pass the disposable offsite restore test. This is
+  deliberately deferred during the fictitious-data IaC phase.
+- Reconcile the declared Nextcloud apps, then enable and accept Collabora before
+  beginning TURN work. HPB remains gated on successful external TURN tests.
+- Select and validate a separate mailcow VM/VPS before following the pinned
+  upstream lifecycle.
 - Define users, groups, sharing policy, retention, and the Dropbox migration
   plan before importing production data.

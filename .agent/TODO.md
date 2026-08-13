@@ -1,59 +1,93 @@
 # TODO
 
-This is the authoritative repository task handoff. Product sequencing remains
-documented in `docs/ARCHITECTURE.md`; do not create a competing root task list.
+This is the authoritative repository handoff. Do not create a competing root
+task list, infer live state from dated evidence, or touch production systems.
 
-## Now
+## Now — documentation and remaining depth
 
-- [ ] On approved disposable infrastructure, validate Vaultwarden's private
-  Caddy route, Web Vault organization/group/role onboarding, 2FA procedure,
-  and restore using the protected matching environment file before activation.
-- [ ] Complete Office Admin Center, Intranet Lite, and HR Lite's documented
-  manual Nextcloud UI target states using fictional accounts, then run group
-  visibility and confidential-folder permission tests.
-- [ ] Review draft PR #1 (`agent/workspace-suite-iac`) in independent stages;
-  validate its static checks and confirm each operational claim before merge.
-- [ ] Reconcile the complete shared Caddy file with the running configuration,
-  validate it, and only then reload the proxy configuration.
-- [ ] Verify public IPv4/IPv6 and TCP 80/443 reachability from a genuinely
-  external network before creating or enabling the production DNS path.
-- [ ] Configure independently stored encrypted offsite backups and perform a
-  documented restore on disposable infrastructure before production migration.
+- [x] Finish the disposable TLS Vaultwarden browser flow: synthetic account
+  login, organization, collection, owner/member roles, and group; then rerun
+  consistent SQLite backup, checksum verification, encrypted temporary Restic
+  roundtrip, and restore to a completely empty target.
+- [x] Run the combined clean deployment harness with automated browser Admin
+  Center, recovery, HR Lite, Intranet Lite, and Talk flows. Prove second-run
+  idempotence, permissions, restart persistence, WebDAV data/share recovery,
+  content/volume preservation across logical module deactivation, and complete
+  resource cleanup. Exact-head GitHub Actions run `31730633740` passed all four
+  jobs for `520c239`; its 13m25s combined job completed the automated browser,
+  second deployment, encrypted temporary Restic, empty-target restore,
+  WebDAV/share, cron, and cleanup path.
+- [x] Correct every failure found by that combined run. Do not weaken assertions
+  merely to make the suite green, and do not claim app-specific objects that
+  could not be provisioned through supported interfaces.
+- [x] Inspect the complete diff against current `origin/main`. The branch is 17
+  commits ahead and 0 behind, with 128 intended changed files; PR #2 has no
+  review or issue comments. Exact-head static validation and full-history
+  Gitleaks passed.
+- [ ] Update visible branding and documentation to **Essentials+ Office**:
+  README, architecture, operations, backup/restore, security, module overview,
+  `docs/CODEX_PROMPT.md`, changelog, agent decisions/architecture, and handoff.
+- [ ] Create `docs/VERIFICATION_MATRIX.md` with the exact evidence classes:
+  static, synthetic Compose, browser E2E, backup/restore, local fake service,
+  NUC, public external, and production. Mark unsupported claims as unverified.
+- [ ] Create `docs/NICE_TO_HAVE.md` containing only the requested future items;
+  add no code, stubs, images, or dependencies for them.
+- [x] Push the focused handoff and validation fixes to
+  `agent/essentials-office-autonomous`. Code and dated verification evidence are
+  pushed through runtime head `520c239` plus the following handoff-only update;
+  inspect GitHub for the live state of superseding PR #2.
 
-## Next
+## Functional gaps to resolve or document honestly
 
-- [ ] Define users, groups, sharing policy, retention, and the Dropbox migration
-  plan before importing production data.
-- [ ] Introduce the documented Nextcloud apps declaratively after core recovery
-  and public-access prerequisites are complete.
-- [ ] Integrate and validate dedicated Collabora, then Talk P2P, TURN, and HPB in
-  the staged order in `docs/ARCHITECTURE.md`.
-- [ ] Evaluate mailcow only as a separately operated stack on infrastructure
-  that satisfies its network, DNS, resource, backup, and restore prerequisites.
-- [ ] Do not activate Visual PBX until its separate product has authentication,
-  roles, secure SIP credential storage, health checks, and clarified rights,
-  participation, and operating ownership.
+- [ ] Automate Collabora create/open/edit/reload through WOPI if it can be done
+  reproducibly without weakening the service boundary. Current evidence covers
+  only health, discovery, host allow-list, and restart recovery.
+- [x] Verify Talk P2P room/participant/message/permission flows in the combined
+  run. The disposable flow passes, including outsider rejection and logical
+  disable/reactivation data preservation. Keep TURN optional; implement
+  HPB only if cleanly reproducible and separated. Never infer real NAT/media
+  quality from a local test.
+- [x] Verify HR Lite fictional directory, onboarding/offboarding, absence,
+  responsibilities, templates, protected files, and least-privilege groups.
+- [ ] Verify Intranet Lite fictional content, editors/readers, confidential area,
+  search/API availability, backup/restore, and content-preserving deactivation.
+  Targeted activation/deactivation and content preservation pass; combined
+  Nextcloud restore remains unconfirmed at this pause.
+- [ ] Exercise Nextcloud Mail configuration against the synthetic TLS IMAP/SMTP
+  server or document the smallest supported remaining step. Do not embed mailcow.
+- [ ] Verify metrics, cron freshness, backup age, last restore evidence,
+  compatibility reporting, controlled patch/minor update, unexpected-major
+  refusal, and the disposable failed-update/rollback path.
 
-## Later
+## Blocked — external mandatory gates
 
-- [ ] Evaluate OIDC/SSO and a common portal only after all core modules are
-  independently stable.
-
-## Blocked
-
-- [ ] Public production availability is blocked until DNS, external routing,
-  firewall reachability, and Caddy configuration drift are resolved and tested.
-- [ ] Production mail is blocked until a suitable host has static public
-  reachability, port 25, controllable PTR/rDNS, sufficient capacity, and a
-  tested mail backup/restore process.
+- [ ] Compare the real running Caddy configuration with the repository file.
+- [ ] Verify public IPv4 and IPv6 reachability.
+- [ ] Verify TCP 80/443 from a genuinely external network.
+- [ ] Verify real DNS.
+- [ ] Verify real TLS certificates.
+- [ ] Verify actual NUC resources and runtime behavior.
+- [ ] Configure and prove a real encrypted offsite provider. A temporary local
+  Restic repository is not offsite evidence.
+- [ ] Verify production mail deliverability and PTR/rDNS.
+- [ ] Verify real Talk media quality through NAT.
+- [ ] Plan and verify the real Dropbox data migration.
 
 ## Recently completed
 
-- [x] Added the reproducible Nextcloud core, persistent-path layout, backup,
-  update, health-check, and DDNS tooling on `main`.
-- [x] Recorded Workspace Suite product boundaries and staged architecture.
-- [x] Replaced the generic root handoff with this persistent task source.
-- [x] Added Office (Essentials Plus) module contract and inactive Admin Center,
-  Vaultwarden, HR Lite, Intranet Lite, and Visual PBX integration boundaries.
-- [x] Ran local static checks and isolated synthetic Vaultwarden backup/restore;
-  no NUC, DNS, Caddy, or real-account action was taken.
+- [x] Incorporated draft PR #1 instead of recreating it, merged current `main`
+  into the local work branch, and preserved the default branch/repository.
+- [x] Added the Essentials+ module manifest/reconciliation contract and safe
+  Nextcloud Admin Center/API/OCC implementation.
+- [x] Added separate optional Vaultwarden, Collabora, Talk/TURN, Mail, HR Lite,
+  Intranet Lite, and Essentials+ Calls boundaries with inactive defaults.
+- [x] Hardened secret handling, backup evidence, restore checks, metrics, image
+  major-version policy, fake service contracts, and disposable test harnesses.
+- [x] Proved the closed Vaultwarden product profile, TLS browser organization/
+  collection/role/group flow, encrypted backup, and empty-target restore with
+  synthetic data only.
+- [x] Passed the exact-head combined clean deployment, automated Admin/user
+  browser flow, HR/Intranet/Talk checks, second deployment, encrypted temporary
+  Restic roundtrip, and full empty-target Nextcloud restore in CI run
+  `31730633740`.
+- [x] Kept all real NUC, Caddy, DNS, network, backups, and user data untouched.

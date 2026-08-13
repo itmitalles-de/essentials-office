@@ -2,11 +2,12 @@
 # Create only fictional HR Lite groups, users, templates, and a protected share.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}
 HR_LITE_SECRETS_FILE=${HR_LITE_SECRETS_FILE:-"$PROJECT_DIR/.hr-lite-demo.env"}
 BASE_URL=
+ALLOW_TEST_HTTP=false
 
 die() {
   printf 'hr-lite-reconcile: %s\n' "$*" >&2
@@ -15,7 +16,7 @@ die() {
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/hr-lite-reconcile.sh [--url https://cloud.example.internal]
+Usage: ./scripts/hr-lite-reconcile.sh [--url https://cloud.example.internal] [--allow-test-http]
 
 This script creates fictional accounts only. It installs compatible Nextcloud
 apps through OCC, creates the HR groups, and publishes the committed templates
@@ -29,6 +30,10 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || die '--url requires an HTTPS URL'
       BASE_URL=${2%/}
       shift 2
+      ;;
+    --allow-test-http)
+      ALLOW_TEST_HTTP=true
+      shift
       ;;
     -h|--help)
       usage
@@ -62,24 +67,21 @@ app_state() {
   jq -e --arg app "$app" --arg state "$state" '.[$state] | has($app)' <<<"$apps" >/dev/null
 }
 
-ensure_app() {
+ensure_app_package() {
   local app=$1
-  if app_state "$app" enabled; then
+  if app_state "$app" enabled || app_state "$app" disabled; then
     return
   fi
-  if app_state "$app" disabled; then
-    occ app:enable "$app" >/dev/null
-  else
-    # OCC selects an app-store release compatible with this Nextcloud version.
-    occ app:install "$app" >/dev/null
-    occ app:enable "$app" >/dev/null
-  fi
+  # OCC selects a compatible App Store release. A fresh install is disabled
+  # again; only the Admin Center applies group visibility and activates it.
+  occ app:install "$app" >/dev/null
+  occ app:disable "$app" >/dev/null
 }
 
 ensure_user() {
   local user=$1 display_name=$2 password=$3
   if ! occ user:info "$user" >/dev/null 2>&1; then
-    compose exec -T -u www-data -e "OC_PASS=$password" app php occ user:add \
+    OC_PASS="$password" compose exec -T -u www-data -e OC_PASS app php occ user:add \
       --password-from-env --display-name "$display_name" "$user" >/dev/null
   fi
 }
@@ -120,12 +122,16 @@ done
 if [ -z "$BASE_URL" ]; then
   BASE_URL=$(awk -F= '$1 == "OVERWRITECLIURL" { print $2; exit }' "$NEXTCLOUD_ENV_FILE")
 fi
-[[ "$BASE_URL" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] ||
-  die 'provide a configured HTTPS Nextcloud URL with --url or OVERWRITECLIURL'
+if [ "$ALLOW_TEST_HTTP" = true ]; then
+  [[ "$BASE_URL" =~ ^http://127\.0\.0\.1:[0-9]+$ ]] || die 'test HTTP mode accepts loopback with an explicit port only'
+else
+  [[ "$BASE_URL" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]] ||
+    die 'provide a configured HTTPS Nextcloud URL with --url or OVERWRITECLIURL'
+fi
 compose config -q
 
 for app in calendar deck forms tables collectives; do
-  ensure_app "$app"
+  ensure_app_package "$app"
 done
 for group in hr-admin manager employee; do
   ensure_group "$group"
@@ -149,7 +155,8 @@ ensure_membership employee-demo employee
 netrc=$(mktemp)
 trap 'rm -f -- "$netrc"' EXIT INT TERM
 chmod 600 "$netrc"
-url_host=${BASE_URL#https://}
+url_host=${BASE_URL#*://}
+url_host=${url_host%%:*}
 printf 'machine %s login %s password %s\n' "$url_host" hr-demo-admin "$hr_admin_password" >"$netrc"
 unset hr_admin_password manager_password employee_password
 
@@ -165,6 +172,11 @@ for template in "$PROJECT_DIR"/hr-lite/templates/*.md; do
   template_name=$(basename "$template")
   curl --fail --silent --show-error --netrc-file "$netrc" --upload-file "$template" \
     "$folder_url/$template_name" >/dev/null
+done
+for fixture in "$PROJECT_DIR"/hr-lite/demo/*; do
+  fixture_name=$(basename "$fixture")
+  curl --fail --silent --show-error --netrc-file "$netrc" --upload-file "$fixture" \
+    "$folder_url/$fixture_name" >/dev/null
 done
 
 shares=$(curl --fail --silent --show-error --netrc-file "$netrc" \
@@ -182,5 +194,4 @@ if ! jq -e --arg group hr-admin \
 fi
 
 printf '%s\n' \
-  'hr-lite-reconcile: fictional users, app prerequisites, templates, and protected share are ready' \
-  'hr-lite-reconcile: complete the documented Forms, Tables, Deck, Calendar, and Collectives setup manually'
+  'hr-lite-reconcile: fictional users, app prerequisites, workflow fixtures, templates, and protected share are ready'

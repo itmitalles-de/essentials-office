@@ -1,0 +1,43 @@
+services:
+  vaultwarden:
+    environment:
+      # Disposable browser fixture only. The product env example and contract
+      # keep registration closed.
+      SIGNUPS_ALLOWED: "true"
+
+  vaultwarden-browser-proxy:
+    image: caddy:2.10.2-alpine@sha256:d8c17a862962def15cde69863a3a463f25a2664942eafd7bdbf050e9c3116b83
+    profiles: ["vaultwarden"]
+    depends_on:
+      vaultwarden:
+        condition: service_healthy
+    user: "1000:1000"
+    environment:
+      XDG_CONFIG_HOME: /tmp/caddy/config
+      XDG_DATA_HOME: /tmp/caddy/data
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ${VAULTWARDEN_TEST_CADDYFILE:?VAULTWARDEN_TEST_CADDYFILE must be set}:/etc/caddy/Caddyfile:ro
+    ports:
+      - 127.0.0.1:${VAULTWARDEN_BROWSER_PORT:?VAULTWARDEN_BROWSER_PORT must be set}:8443
+    networks:
+      - proxy_net
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The official Caddy binary carries cap_net_bind_service. Retaining only
+    # that capability avoids an OCI exec denial under no-new-privileges.
+    cap_add:
+      - NET_BIND_SERVICE
+    healthcheck:
+      # BusyBox wget in the pinned Caddy image cannot opt out of trust checks
+      # for the disposable CA. This verifies proxy reachability to the upstream;
+      # the harness separately curls the public TLS listener.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://vaultwarden:8080/alive"]
+      interval: 5s
+      timeout: 5s
+      retries: 12

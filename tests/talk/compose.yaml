@@ -1,0 +1,21 @@
+services:
+  turn:
+    image: coturn/coturn:4.17.2-r0@sha256:aa68aab64a3b929d57fc2924c98ea447bf996cf8dade2508e7b71eaf23f1f14e
+    user: "65534:${TURN_RUNTIME_GID:?TURN_RUNTIME_GID must be set}"
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - ${TURN_TEST_CONFIG:?TURN_TEST_CONFIG must be set}:/etc/coturn/turnserver.conf:ro
+    networks: [turn_test]
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,noexec,nosuid,size=16m
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_stunclient -p 3478 127.0.0.1 >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+networks:
+  turn_test:
+    internal: true

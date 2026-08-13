@@ -2,7 +2,7 @@
 # Restore a Vaultwarden backup only into a new, empty target directory.
 set -Eeuo pipefail
 
-SQLITE_IMAGE=keinos/sqlite3:3.51.3
+SQLITE_IMAGE=keinos/sqlite3:3.51.3@sha256:520cfebb116119cc642b72d72c3ff948cc120a891dc4d83824c664f1ca65a354
 
 die() {
   printf 'vaultwarden-restore: %s\n' "$*" >&2

@@ -2,8 +2,8 @@
 # Update the intentionally pinned Vaultwarden image after a separate version change.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}
 VAULTWARDEN_COMPOSE_PROJECT_NAME=${VAULTWARDEN_COMPOSE_PROJECT_NAME:-}
 
@@ -27,7 +27,7 @@ command -v docker >/dev/null 2>&1 || die 'Docker is required'
 [ -f "${VAULTWARDEN_ENV_FILE:-$PROJECT_DIR/.vaultwarden.env}" ] ||
   die 'missing private Vaultwarden environment file'
 compose config -q
-compose config --images | grep -Fxq vaultwarden/server:1.37.1 ||
+compose config --images | grep -Fxq 'vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8' ||
   die 'the expected pinned Vaultwarden image is missing from the overlay'
 
 "$SCRIPT_DIR/vaultwarden-backup.sh"

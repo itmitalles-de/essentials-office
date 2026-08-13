@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloud.itmitalles.de/schemas/office-modules.schema.json",
+  "title": "Essentials+ Office module contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "contractVersion", "schemaVersion", "product", "states", "groups", "adminCenter", "modules"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "contractVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "schemaVersion": {"const": "1.0.0"},
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "brand"],
+      "properties": {
+        "id": {"const": "essentialsplus-office"},
+        "displayName": {"const": "Essentials+ Office"},
+        "brand": {"const": "Essentials Plus"}
+      }
+    },
+    "states": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"enum": ["not_installed", "needs_configuration", "disabled", "enabled", "degraded"]}
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "displayName", "order"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+          "displayName": {"type": "string", "minLength": 2},
+          "order": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "adminCenter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ownerGroup", "auditRetentionEntries", "userVisibilityRule", "externalActivationRule"],
+      "properties": {
+        "ownerGroup": {"const": "admin"},
+        "auditRetentionEntries": {"type": "integer", "minimum": 100, "maximum": 10000},
+        "userVisibilityRule": {"type": "string", "minLength": 20},
+        "externalActivationRule": {"type": "string", "minLength": 20}
+      }
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/module"}
+    }
+  },
+  "$defs": {
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "version", "group", "displayName", "description", "type", "required", "defaultState",
+        "dependencies", "conflicts", "compatibility", "configuration", "secrets", "groups", "roles",
+        "nextcloudApps", "composeServices", "externalServices", "jobs", "webhooks", "healthcheck",
+        "dataOwnership", "backup", "restore", "export", "activation", "deactivation", "update"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "group": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+        "displayName": {"type": "string", "minLength": 2},
+        "description": {"type": "string", "minLength": 10},
+        "type": {"enum": ["nextcloud-core", "nextcloud-composite", "nextcloud-workflow", "external-service", "external-integration"]},
+        "required": {"type": "boolean"},
+        "defaultState": {"enum": ["not_installed", "needs_configuration", "disabled", "enabled", "degraded"]},
+        "dependencies": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "conflicts": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nextcloud", "apps", "manifestSchema"],
+          "properties": {
+            "nextcloud": {"$ref": "#/$defs/versionRange"},
+            "apps": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["schema"],
+              "properties": {"schema": {"type": "string", "minLength": 1}}
+            },
+            "manifestSchema": {"const": "1.0.0"}
+          }
+        },
+        "configuration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requirements"],
+          "properties": {
+            "requirements": {"type": "array", "items": {"$ref": "#/$defs/configRequirement"}}
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requirements", "handling"],
+          "properties": {
+            "requirements": {"type": "array", "items": {"$ref": "#/$defs/secretRequirement"}},
+            "handling": {"type": "string", "minLength": 10}
+          }
+        },
+        "groups": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default", "allowed", "autoCreate"],
+          "properties": {
+            "default": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "allowed": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "autoCreate": {"type": "boolean"}
+          }
+        },
+        "roles": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "nextcloudApps": {"type": "array", "items": {"$ref": "#/$defs/nextcloudApp"}},
+        "composeServices": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "externalServices": {"type": "array", "items": {"type": "object"}},
+        "jobs": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "webhooks": {"type": "array", "items": {"type": "object"}},
+        "healthcheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "cacheSeconds", "expectedStatuses"],
+          "properties": {
+            "kind": {"enum": ["nextcloud", "nextcloud-apps", "nextcloud-apps-and-attestation", "https", "attestation"]},
+            "endpointConfigurationKey": {"type": "string"},
+            "allowedHostSuffixes": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "attestationKeys": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+            "cacheSeconds": {"type": "integer", "minimum": 30, "maximum": 86400},
+            "expectedStatuses": {"type": "array", "uniqueItems": true, "items": {"type": "integer", "minimum": 100, "maximum": 599}}
+          }
+        },
+        "dataOwnership": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["owner", "stores", "sharedDatabase"],
+          "properties": {
+            "owner": {"type": "string", "minLength": 2},
+            "stores": {"type": "array", "items": {"type": "string"}},
+            "sharedDatabase": {"const": false}
+          }
+        },
+        "backup": {"$ref": "#/$defs/lifecycleBoundary"},
+        "restore": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["boundary", "preservesDataOnDisable"],
+          "properties": {
+            "boundary": {"type": "string", "minLength": 3},
+            "preservesDataOnDisable": {"const": true}
+          }
+        },
+        "export": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["format", "available"],
+          "properties": {"format": {"type": "string"}, "available": {"type": "boolean"}}
+        },
+        "activation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "requiresHealthy", "hostControl"],
+          "properties": {
+            "mode": {"type": "string"},
+            "requiresHealthy": {"const": true},
+            "hostControl": {"const": false}
+          }
+        },
+        "deactivation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed", "deletesData", "stopsService"],
+          "properties": {
+            "allowed": {"type": "boolean"},
+            "deletesData": {"const": false},
+            "stopsService": {"const": false}
+          }
+        },
+        "update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policy", "rollback"],
+          "properties": {"policy": {"type": "string", "minLength": 5}, "rollback": {"type": "string", "minLength": 5}}
+        }
+      }
+    },
+    "versionRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "maxExclusive"],
+      "properties": {
+        "min": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "maxExclusive": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+      }
+    },
+    "configRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "type", "required"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]+$"},
+        "type": {"enum": ["boolean", "https-url", "attestation", "string"]},
+        "required": {"type": "boolean"}
+      }
+    },
+    "secretRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "required", "source"],
+      "properties": {
+        "id": {"type": "string"},
+        "required": {"type": "boolean"},
+        "source": {"type": "string", "minLength": 3}
+      }
+    },
+    "nextcloudApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "required", "source", "minVersion", "maxExclusive"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]+$"},
+        "required": {"type": "boolean"},
+        "source": {"enum": ["shipped", "app-store", "repository"]},
+        "minVersion": {"type": "string"},
+        "maxExclusive": {"type": "string"},
+        "visibilityMode": {
+          "enum": ["module-groups", "platform-global"],
+          "default": "module-groups"
+        }
+      }
+    },
+    "lifecycleBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary", "includes"],
+      "properties": {
+        "boundary": {"type": "string", "minLength": 3},
+        "includes": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

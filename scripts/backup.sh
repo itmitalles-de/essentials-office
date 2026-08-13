@@ -2,11 +2,12 @@
 # Create a consistent, local Nextcloud backup. Run as root or through sudo.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
-BACKUP_ROOT=${BACKUP_DIR:-/srv/nextcloud/backups}
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
+BACKUP_ROOT=
+DATA_ROOT=
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-FINAL_DIR="$BACKUP_ROOT/$STAMP"
+FINAL_DIR=
 WORK_DIR=
 MAINTENANCE_ENABLED=false
 CRON_STOPPED=false
@@ -14,6 +15,11 @@ CRON_STOPPED=false
 die() {
   printf 'backup: %s\n' "$*" >&2
   exit 1
+}
+
+env_value() {
+  local key=$1
+  awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$PROJECT_DIR/.env"
 }
 
 cleanup() {
@@ -44,11 +50,24 @@ fi
 command -v docker >/dev/null 2>&1 || die 'Docker is required'
 command -v tar >/dev/null 2>&1 || die 'tar is required'
 command -v flock >/dev/null 2>&1 || die 'flock is required'
+command -v sha256sum >/dev/null 2>&1 || die 'sha256sum is required'
+command -v jq >/dev/null 2>&1 || die 'jq is required'
 [ -f "$PROJECT_DIR/.env" ] || die "missing $PROJECT_DIR/.env; run bootstrap.sh first"
+
+DATA_ROOT=$(env_value NEXTCLOUD_DATA_ROOT)
+[ -n "$DATA_ROOT" ] || die 'NEXTCLOUD_DATA_ROOT is empty in .env'
+BACKUP_ROOT=${BACKUP_DIR:-$DATA_ROOT/backups}
+case "$BACKUP_ROOT" in
+  /*) ;;
+  *) die 'backup root must be an absolute path' ;;
+esac
+[ "$BACKUP_ROOT" != / ] || die 'backup root must not be the filesystem root'
+FINAL_DIR="$BACKUP_ROOT/$STAMP"
 
 cd "$PROJECT_DIR"
 docker compose config -q
-mkdir -p -m 0700 "$BACKUP_ROOT"
+mkdir -p "$BACKUP_ROOT"
+chmod 0700 "$BACKUP_ROOT"
 exec 9>"$BACKUP_ROOT/.backup.lock"
 flock -n 9 || die 'another backup is already running'
 
@@ -61,13 +80,15 @@ MAINTENANCE_ENABLED=true
 docker compose stop --timeout 10 cron >/dev/null
 CRON_STOPPED=true
 
-docker compose exec -T db sh -ec 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-privileges' >"$WORK_DIR/nextcloud.pg.dump"
+# Preserve object ownership and ACL metadata. Nextcloud 34 can use a dedicated
+# application database role even when POSTGRES_USER is the administrative role.
+docker compose exec -T db sh -ec 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' >"$WORK_DIR/nextcloud.pg.dump"
 
 # PostgreSQL is backed up through pg_dump above. Do not copy its live data
 # directory: a raw copy while PostgreSQL is running is not a consistent backup.
 tar --create --gzip --file "$WORK_DIR/nextcloud-files.tar.gz" \
   --numeric-owner --acls --xattrs \
-  -C /srv/nextcloud html data redis
+  -C "$DATA_ROOT" html data
 
 docker compose config >"$WORK_DIR/compose.resolved.yaml"
 sed -Ei \
@@ -76,11 +97,27 @@ sed -Ei \
 cp compose.yaml "$WORK_DIR/compose.yaml"
 cp .env.example "$WORK_DIR/env.example"
 cp Caddyfile.example "$WORK_DIR/Caddyfile.example"
+if git -C "$PROJECT_DIR" rev-parse HEAD >"$WORK_DIR/repository-commit.txt" 2>/dev/null; then
+  chmod 0600 "$WORK_DIR/repository-commit.txt"
+else
+  printf 'unknown\n' >"$WORK_DIR/repository-commit.txt"
+fi
+app_versions=$(docker compose exec -T -u www-data app php occ app:list --output=json)
+image_metadata=$(docker compose config --images | sort -u | while IFS= read -r image; do
+  docker image inspect "$image" --format '{{json .}}' | jq -c '{requested: .RepoTags[0], imageId: .Id, repoDigests: (.RepoDigests // [])}'
+done | jq -s .)
+jq -n --arg createdAt "$STAMP" --argjson apps "$app_versions" --argjson images "$image_metadata" \
+  '{createdAt: $createdAt, apps: $apps, images: $images}' >"$WORK_DIR/versions.json"
 printf '%s\n' \
   'Database restore source: nextcloud.pg.dump (custom pg_dump format).' \
-  'Filesystem archive includes html, data, and redis; PostgreSQL is intentionally excluded because the logical dump is consistent.' \
+  'Filesystem archive includes html and data; PostgreSQL is represented by the logical dump and Redis is intentionally rebuilt empty.' \
   'The live .env file is intentionally not included. Restore it from protected secret storage.' \
   >"$WORK_DIR/README.txt"
+(
+  cd "$WORK_DIR"
+  mapfile -d '' checksum_files < <(find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z)
+  sha256sum -- "${checksum_files[@]}" | sed 's|  \./|  |' >SHA256SUMS
+)
 
 docker compose exec -T -u www-data app php occ maintenance:mode --off >/dev/null
 MAINTENANCE_ENABLED=false
@@ -89,4 +126,6 @@ CRON_STOPPED=false
 
 mv -- "$WORK_DIR" "$FINAL_DIR"
 WORK_DIR=
+docker compose exec -T -u www-data app php occ config:app:set essentialsplus evidence.backup \
+  --value="$(date +%s)" >/dev/null 2>&1 || true
 printf 'backup: created %s\n' "$FINAL_DIR"

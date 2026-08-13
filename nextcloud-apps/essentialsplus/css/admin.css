@@ -1,0 +1,81 @@
+.essentialsplus-admin,
+.essentialsplus-portal {
+    box-sizing: border-box;
+    max-width: 1280px;
+    padding: 24px;
+}
+
+.essentialsplus-banner {
+    background: var(--color-primary-light, #e8f3ff);
+    border-left: 4px solid var(--color-primary-element, #00679e);
+    margin: 16px 0;
+    padding: 12px 16px;
+}
+
+.essentialsplus-group {
+    margin: 28px 0;
+}
+
+.essentialsplus-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.essentialsplus-module {
+    background: var(--color-main-background, #fff);
+    border: 1px solid var(--color-border, #d8d8d8);
+    border-radius: var(--border-radius-large, 8px);
+    padding: 18px;
+}
+
+.essentialsplus-module-heading,
+.essentialsplus-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.essentialsplus-state {
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    display: inline-block;
+    font-family: monospace;
+    padding: 2px 8px;
+}
+
+.state-enabled { color: var(--color-success, #2d7d46); }
+.state-degraded { color: var(--color-warning, #a56700); }
+.state-not_installed,
+.state-needs_configuration { color: var(--color-error, #c32929); }
+.state-disabled { color: var(--color-text-maxcontrast, #6b6b6b); }
+
+.essentialsplus-facts {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 12px;
+}
+
+.essentialsplus-facts dt { font-weight: 600; }
+.essentialsplus-issues { color: var(--color-error, #c32929); }
+
+.essentialsplus-visibility {
+    border: 0;
+    margin: 12px 0;
+    padding: 0;
+}
+
+.essentialsplus-visibility label {
+    display: block;
+    margin: 4px 0;
+}
+
+.essentialsplus-actions {
+    justify-content: flex-start;
+    margin-top: 12px;
+}
+
+.essentialsplus-audit { margin-top: 28px; }
+.essentialsplus-empty { color: var(--color-text-maxcontrast, #6b6b6b); }

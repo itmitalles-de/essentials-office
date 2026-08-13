@@ -11,8 +11,18 @@ integrations/visual-pbx.env
 # Runtime data and locally created backups
 backups/
 *.log
+restore-output/
+reports/
+inventory-*.md
+
+# Runtime-only secret material (the directory itself remains documentation-only)
+secrets/*.secret
+secrets/*.key
+secrets/*.pem
 
 # Editors and operating-system files
 .DS_Store
 .idea/
 .vscode/
+__pycache__/
+*.pyc

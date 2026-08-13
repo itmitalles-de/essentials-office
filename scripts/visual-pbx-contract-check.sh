@@ -2,11 +2,12 @@
 # Verify that the Visual PBX boundary remains opt-in and credential-free.
 set -Eeuo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-PROJECT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 CONFIG=${VISUAL_PBX_CONFIG:-"$PROJECT_DIR/integrations/visual-pbx.env"}
 NEXTCLOUD_ENV_FILE=${NEXTCLOUD_ENV_FILE:-"$PROJECT_DIR/.env"}
 CHECK_HEALTH=false
+TEST_MODE=${VISUAL_PBX_TEST_MODE:-false}
 
 die() {
   printf 'visual-pbx-contract-check: %s\n' "$*" >&2
@@ -52,10 +53,21 @@ fi
 portal_url=$(config_value VISUAL_PBX_PORTAL_URL)
 health_url=$(config_value VISUAL_PBX_HEALTH_URL)
 for url in "$portal_url" "$health_url"; do
-  [[ "$url" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]([/:][^@?]*)?$ ]] ||
-    die 'enabled Visual PBX links must be credential-free HTTPS URLs without query strings'
+  if [ "$TEST_MODE" = true ]; then
+    [[ "$url" =~ ^https://127\.0\.0\.1:[0-9]+(/[A-Za-z0-9._/-]*)?$ ]] ||
+      die 'Visual PBX test mode accepts loopback HTTPS URLs only'
+  else
+    [[ "$url" =~ ^https://[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]([/:][^@?]*)?$ ]] ||
+      die 'enabled Visual PBX links must be credential-free HTTPS URLs without query strings'
+  fi
 done
 [ "$CHECK_HEALTH" = true ] || die 'run with --check-health before publishing an enabled PBX link'
-curl --fail --silent --show-error --max-time 10 --output /dev/null "$health_url" ||
+curl_args=(--fail --silent --show-error --max-time 10 --output /dev/null)
+ca_file=$(config_value VISUAL_PBX_CA_FILE)
+if [ -n "$ca_file" ]; then
+  [ -f "$ca_file" ] || die 'configured Visual PBX CA file is missing'
+  curl_args+=(--cacert "$ca_file")
+fi
+curl "${curl_args[@]}" "$health_url" ||
   die 'Visual PBX health endpoint did not pass'
 printf 'visual-pbx-contract-check: enabled link is credential-free and its health endpoint passed\n'
