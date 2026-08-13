@@ -398,7 +398,11 @@ def create_organization_objects(driver: Driver, member_email: str) -> None:
         driver.click_text("Collection")
     except RuntimeError:
         pass
-    driver.fill_label("Name", "Synthetic Shared Collection")
+    def fill_collection_name() -> bool:
+        driver.fill_label("Name", "Synthetic Shared Collection")
+        return True
+
+    wait_for(fill_collection_name, "organization collection form did not finish loading", 30)
     driver.click_text("Save")
     wait_for(lambda: "synthetic shared collection" in driver.body_text().lower(), "collection was not created")
     wait_for(
@@ -483,6 +487,28 @@ def main() -> int:
                   url: location.href,
                   actions: Array.from(document.querySelectorAll('button,a,[role="button"],[role="link"],[role="menuitem"],[role="tab"]'))
                     .map((node) => (node.innerText || node.textContent || '').trim()).filter(Boolean).slice(0, 100),
+                  fields: Array.from(document.querySelectorAll('input,textarea')).map((node) => {
+                    const ancestors = [];
+                    for (let parent = node.parentElement; parent && ancestors.length < 6; parent = parent.parentElement) {
+                      ancestors.push({
+                        tag: parent.tagName.toLowerCase(),
+                        role: parent.getAttribute('role'),
+                        ariaLabel: parent.getAttribute('aria-label'),
+                      });
+                    }
+                    return {
+                      tag: node.tagName.toLowerCase(),
+                      type: node.getAttribute('type'),
+                      id: node.id,
+                      name: node.name,
+                      placeholder: node.placeholder,
+                      ariaLabel: node.getAttribute('aria-label'),
+                      formControlName: node.getAttribute('formcontrolname'),
+                      testId: node.getAttribute('data-testid'),
+                      visible: node.getClientRects().length > 0,
+                      ancestors,
+                    };
+                  }),
                 };
                 """
             )
