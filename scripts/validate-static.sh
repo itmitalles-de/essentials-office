@@ -5,6 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 CADDY_IMAGE='caddy:2.10.2-alpine@sha256:d8c17a862962def15cde69863a3a463f25a2664942eafd7bdbf050e9c3116b83'
+SHELLCHECK_IMAGE='koalaman/shellcheck-alpine:v0.11.0@sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002'
 
 die() {
   printf 'validate-static: %s\n' "$*" >&2
@@ -53,13 +54,9 @@ docker compose -f tests/talk/compose.yaml config -q
 mapfile -d '' shell_scripts < <(find scripts tests -type f -name '*.sh' -print0 | sort -z)
 [ "${#shell_scripts[@]}" -gt 0 ] || die 'no shell scripts found'
 for script in "${shell_scripts[@]}"; do bash -n "$script"; done
-if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck -x "${shell_scripts[@]}"
-else
-  docker run --rm --network none --entrypoint sh -v "$PROJECT_DIR:/repo:ro" \
-    koalaman/shellcheck-alpine:v0.11.0 \
-    -ec 'find /repo/scripts /repo/tests -type f -name "*.sh" -print0 | xargs -0 shellcheck -x'
-fi
+docker run --rm --network none --entrypoint sh -v "$PROJECT_DIR:/repo:ro" \
+  "$SHELLCHECK_IMAGE" \
+  -ec 'find /repo/scripts /repo/tests -type f -name "*.sh" -print0 | xargs -0 shellcheck -x'
 
 python3 - <<'PY'
 import pathlib

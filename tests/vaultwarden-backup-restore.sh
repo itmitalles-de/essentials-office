@@ -113,7 +113,10 @@ umask 077
 chromedriver --port=9516 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
 CHROMEDRIVER_PID=$!
 sleep 1
-chromium_bin=$(command -v chromium || command -v chromium-browser || command -v chrome || command -v google-chrome || true)
+chromium_bin=${CHROMIUM_BIN:-}
+if [ -z "$chromium_bin" ]; then
+  chromium_bin=$(command -v chrome || command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+fi
 [ -n "$chromium_bin" ] || die 'Chromium or Chrome executable is missing'
 VAULTWARDEN_BASE_URL="https://localhost:$VAULTWARDEN_BROWSER_PORT" \
 VAULTWARDEN_BROWSER_SECRETS_FILE="$browser_secrets" \

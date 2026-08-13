@@ -214,7 +214,10 @@ run_browser_e2e() {
   occ config:system:set overwrite.cli.url --value="$browser_base" >/dev/null
   occ config:system:set overwritehost --value="deploy-test.invalid:$browser_port" >/dev/null
 
-  chromium_bin=$(command -v chromium-browser || command -v chromium || command -v chrome || command -v google-chrome || true)
+  chromium_bin=${CHROMIUM_BIN:-}
+  if [ -z "$chromium_bin" ]; then
+    chromium_bin=$(command -v chrome || command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+  fi
   [ -n "$chromium_bin" ] || die 'Chromium executable is missing'
   chromedriver --port=9515 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
   CHROMEDRIVER_PID=$!
