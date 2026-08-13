@@ -1,5 +1,10 @@
 # Nextcloud Talk rollout
 
+Talk declares Nextcloud's `prevent_group_restriction` app type. Office therefore
+activates the app globally when the module is enabled while keeping its catalog
+entry and room participation permission-controlled. Logical deactivation may
+disable the app but never deletes rooms, messages, files, or TURN state.
+
 ## Stage 1: app, chat, and small calls
 
 Install Talk through the declarative app reconciliation. Test one-to-one chat,

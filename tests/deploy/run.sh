@@ -263,7 +263,9 @@ run_recovery_e2e() {
     --data-urlencode 'path=/essentialsplus-recovery.txt' --data 'shareType=0' \
     --data-urlencode "shareWith=$recovery_user" --data 'permissions=1' \
     'http://127.0.0.1/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json')
-  jq -e '.ocs.meta.statuscode == 100 and (.ocs.data.id | tostring | length > 0)' <<<"$shares" >/dev/null ||
+  jq -e '.ocs.meta.status == "ok"
+    and (.ocs.meta.statuscode == 100 or .ocs.meta.statuscode == 200)
+    and (.ocs.data.id | tostring | length > 0)' <<<"$shares" >/dev/null ||
     die 'could not create synthetic recovery share'
   unset recovery_password admin_password
 
@@ -394,12 +396,16 @@ run_talk_e2e() {
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
     --data 'source=users' --data 'newParticipant=talk-bob-demo' \
     "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room/$token/participants?format=json")
-  jq -e '.ocs.meta.statuscode == 100' <<<"$participant" >/dev/null || die 'Talk participant invitation failed'
+  jq -e '.ocs.meta.status == "ok"
+    and (.ocs.meta.statuscode == 100 or .ocs.meta.statuscode == 200)' <<<"$participant" >/dev/null ||
+    die 'Talk participant invitation failed'
   message=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
     --data-urlencode 'message=Essentials+ Office synthetic Talk message' \
     "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json")
-  jq -e '.ocs.meta.statuscode == 100 and (.ocs.data.id | tonumber) > 0' <<<"$message" >/dev/null || die 'Talk message send failed'
+  jq -e '.ocs.meta.status == "ok"
+    and .ocs.meta.statuscode == 201
+    and (.ocs.data.id | tonumber) > 0' <<<"$message" >/dev/null || die 'Talk message send failed'
   messages=$(curl --fail --silent --show-error --netrc-file "$bob_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' \
     "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100")
@@ -506,7 +512,10 @@ run_module_control_tests() {
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,hr-lite"
   fi
   if [ "$WITH_TALK" = true ]; then
-    state=$(occ essentialsplus:module:enable talk) || die 'Talk enable command failed'
+    if ! state=$(occ essentialsplus:module:enable talk); then
+      printf '%s\n' "$state" >&2
+      die 'Talk enable command failed'
+    fi
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Talk activation failed'
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,talk"
   fi

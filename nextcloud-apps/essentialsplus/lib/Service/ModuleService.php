@@ -337,13 +337,11 @@ final class ModuleService {
         foreach ($module['nextcloudApps'] as $app) {
             if ($this->appRequiredByAnotherActiveModule($app['id'], $module['id'])) {
                 $this->applyAppVisibilityForApp($app['id'], null);
-            } elseif (($app['visibilityMode'] ?? 'module-groups') === 'platform-global') {
-                // Nextcloud forbids group restriction for protected platform
-                // app types such as Teams/circles. Logical module visibility
-                // and content ACLs remain restricted; deactivation must not
-                // disable or delete the shared platform capability.
-                continue;
             } elseif ($this->appManager->isEnabledForAnyone($app['id'])) {
+                // Disabling an app preserves its database and file data. A
+                // platform-global app is disabled only when no other active
+                // module declares it, so optional-module deactivation remains
+                // non-destructive while hiding the shared capability.
                 $this->appManager->disableApp($app['id']);
             }
         }

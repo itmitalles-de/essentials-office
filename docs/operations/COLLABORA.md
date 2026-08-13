@@ -1,5 +1,11 @@
 # Dedicated Collabora Online
 
+The `richdocuments` app declares protected filesystem and
+`prevent_group_restriction` types, so Nextcloud does not support enabling it for
+selected groups. Office treats it as a platform-global app while the module is
+active; document/file permissions remain authoritative. Logical deactivation
+may disable the app but never deletes documents or Collabora service data.
+
 ## Deployment boundary
 
 `compose.collabora.yaml` adds one optional `office` profile. It uses the pinned

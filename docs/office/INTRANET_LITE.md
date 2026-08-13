@@ -12,8 +12,9 @@ Center as protected platform app types and therefore refuses per-group app
 enablement for them. The module manifest marks those prerequisites
 `platform-global`; Office still restricts the Intranet catalog entry and the
 actual Collectives/files through module groups and content ACLs. Logical
-deactivation leaves shared platform apps enabled and deletes neither apps nor
-content. Dashboard, Tables, and Deck use the union of active module groups.
+deactivation disables a shared platform app only when no other active module
+needs it and deletes neither app data nor content. Dashboard, Tables, and Deck
+use the union of active module groups.
 
 It is off by default and is not a reason to install Wiki.js or BookStack in
 parallel. A future standalone wiki requires its own product decision, data

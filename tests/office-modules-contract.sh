@@ -67,6 +67,10 @@ jq -e '
   ([.modules[] | select(.id == "hr-lite") | .nextcloudApps[] |
     select(.visibilityMode == "platform-global") | .id] | sort) ==
     (["collectives", "forms"] | sort) and
+  ([.modules[] | select(.id == "collabora") | .nextcloudApps[] |
+    select(.visibilityMode == "platform-global") | .id] == ["richdocuments"]) and
+  ([.modules[] | select(.id == "talk") | .nextcloudApps[] |
+    select(.visibilityMode == "platform-global") | .id] == ["spreed"]) and
   ([.modules[] | select(.id == "vaultwarden") | .composeServices] == [["vaultwarden"]]) and
   ([.modules[] | select(.id == "essentials-calls") | .externalServices[0].repository] == ["itmitalles-de/visual-pbx"])
 ' "$CONTRACT" >/dev/null || die 'module contract violates an Essentials+ Office invariant'
