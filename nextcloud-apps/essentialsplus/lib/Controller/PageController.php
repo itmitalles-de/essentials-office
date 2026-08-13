@@ -7,6 +7,7 @@ namespace OCA\EssentialsPlus\Controller;
 use OCA\EssentialsPlus\Service\ModuleService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -23,6 +24,7 @@ final class PageController extends Controller {
     }
 
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function index(): TemplateResponse {
         $user = $this->userSession->getUser();
         if ($user === null) {
