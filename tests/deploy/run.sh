@@ -459,7 +459,7 @@ assert_intranet_data_present() {
 }
 
 run_module_control_tests() {
-  local state enabled_groups failure_output
+  local state enabled_groups failure_output metrics
   printf 'deploy-test: starting OCC module control and health-gate checks\n'
   state=$(occ essentialsplus:module:status nextcloud-core) || die 'core module status command failed'
   jq -e '.id == "nextcloud-core" and .state == "enabled" and .active == true' <<<"$state" >/dev/null ||
@@ -547,7 +547,8 @@ run_module_control_tests() {
       INTRANET_SECRETS_FILE="$INTRANET_SECRETS_FILE" "$WORK_DIR/scripts/intranet-lite-reconcile.sh" \
       --verify --url "$INTRANET_TEST_BASE" --allow-test-http
   fi
-  occ essentialsplus:metrics | rg -q '^essentialsplus_module_state\{module="nextcloud-core",state="enabled"\} 1$' ||
+  metrics=$(occ essentialsplus:metrics) || die 'Prometheus module metrics command failed'
+  rg -q '^essentialsplus_module_state\{module="nextcloud-core",state="enabled"\} 1$' <<<"$metrics" ||
     die 'Prometheus module metrics are missing the healthy core state'
   printf 'deploy-test: OCC/API control, health gates, shared visibility, disable preservation, and metrics passed\n'
 }
