@@ -1,91 +1,83 @@
-# Codex-Ausführungsprompt: Workspace Suite aufbauen
+# Codex execution guide: Office (Essentials Plus)
 
-Du arbeitest im privaten Repository `itmitalles-de/cloud.itmitalles.de`, das als **Workspace Suite** weitergeführt und administrativ später in `itmitalles-de/workspace-suite` umbenannt wird. Lies zuerst `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md`, `compose.yaml` und alle Scripts vollständig. Der bereits laufende Nextcloud-Core auf dem NUC muss erhalten bleiben.
+Work in the private repository `itmitalles-de/cloud.itmitalles.de`. The product
+is **Office**, under the Essentials Plus brand. Do not rename the repository as
+part of normal implementation work. Read `AGENTS.md`, `.agent/STATE.md`,
+`.agent/TODO.md`, `README.md`, `docs/ARCHITECTURE.md`, `compose.yaml`, and the
+affected scripts before changing anything. Preserve the existing Nextcloud core
+on the NUC, `/opt/nextcloud`, `/srv/nextcloud`, shared Caddy, and `proxy_net`.
 
-## Ziel
+## Implemented reality first
 
-Baue aus dem validierten Nextcloud-Deployment schrittweise eine reproduzierbare Open-Source-Alternative zu Microsoft 365 / Google Workspace:
+Treat `.agent/STATE.md` and current code as truth. Historical completed work in
+this document is not an implementation queue. PR #1 is a draft and must not be
+described as deployed. Host, DNS, Caddy, NUC, and real-account changes require
+an explicitly provided deployment process; do not infer that authority.
 
-- Dateien, Freigaben und Sync
-- Kalender, Kontakte und Aufgaben
-- browserbasierte Dokumente, Tabellen und Präsentationen
-- Chat und Videokonferenzen
-- E-Mail
-- persönliche Notizen, Teamwissen und Kanban
+## Product contract
 
-## Harte Randbedingungen
+Office uses `office-modules.json` as its Essentials Plus module contract:
 
-- Keine echten Nutzer-, Kunden- oder Maildaten in Git oder Demo-Seeds.
-- Keine Secrets in Git, Ausgaben, Issues oder Logs.
-- Keine automatische Nextcloud-Major-Aktualisierung.
-- Bestehende Pfade `/opt/nextcloud` und `/srv/nextcloud`, Volumes, Caddy und `proxy_net` erhalten.
-- Kein Wechsel zu Nextcloud AIO ohne separaten Migrationsvergleich und Rollback.
-- mailcow nicht in die Nextcloud-Compose-Datei kopieren.
-- Nextcloud ist führend für Calendar/Contacts/Tasks; SOGo bleibt optionaler Fallback.
-- Demo und Produktion klar trennen.
+- Nextcloud is the core for files and canonical calendar, contacts, and tasks.
+- Collabora, Talk, Mail/mailcow, Vaultwarden, HR Lite, Intranet Lite, and
+  Visual PBX are independent optional modules, never a big-bang Compose stack.
+- The Office Admin Center is a restricted Nextcloud Collectives catalog.
+  Administrators see all thematic modules; ordinary users see only healthy,
+  activated modules explicitly limited to groups they belong to.
+- An external service becomes visible only after configuration and a successful
+  documented health check. A disabled module never loses its data or volumes.
+- Intranet Lite is Collectives, Teams, Dashboard, and Announcement Center;
+  never install Wiki.js or BookStack as a parallel default wiki.
+- mailcow is a separate upstream stack or host. Never put it in `compose.yaml`.
+- Visual PBX remains in `itmitalles-de/visual-pbx`. Office only owns an inactive
+  portal/health contract, never PBX source, ports, proxying, credentials, or a
+  shared data store.
 
-## Reihenfolge
+## Current completed implementation
 
-### 1. Grundlage produktionsfähig machen
+- The default core remains Nextcloud 34 Apache, PostgreSQL 17, Redis 7, cron,
+  shared-Caddy topology, backups, update tooling, health checks, and optional
+  Namecheap IPv4 DDNS.
+- Vaultwarden has a pinned `1.37.1` optional profile, closed signups, no host
+  port, private Caddy fragment, separate secrets/data, health check, consistent
+  SQLite backup, empty-target restore, update/rollback guide, and a synthetic
+  isolated container-level restore test. It is not enabled on the NUC.
+- HR Lite has fictional-only templates, supported OCC/WebDAV/OCS reconciliation,
+  group/permission verification, and manual steps for APIs that do not support
+  reliable provisioning. It is not configured on the NUC.
+- Intranet Lite has the optional app/group reconciler and manual target state;
+  it is inactive.
+- Visual PBX has a disabled, credential-free integration contract and a test
+  that rejects a PBX service or public Caddy proxy in this repository.
+- The Office Admin Center contract, grouped catalog, activation preflight, and
+  non-destructive deactivation helper are implemented.
 
-- Reproduziere und dokumentiere den aktuellen Stand des NUC.
-- Schließe öffentliche DNS-/Caddy-Erreichbarkeit nur nach Validierung der bestehenden Konfigurationsdrift ab.
-- Implementiere verschlüsseltes Offsite-Backup und teste einen Restore auf Wegwerf-Infrastruktur.
-- Ergänze CI für Compose-Validierung, Shell-Syntax und statische Secret-Prüfung. Hostabhängige Checks dürfen nicht fälschlich in GitHub Actions simuliert werden.
+## Hard constraints
 
-### 2. Nextcloud-Apps deklarativ verwalten
+- Never commit `.env`, generated module files, real user data, mailboxes,
+  private keys, backups, SIP credentials, SMTP credentials, or tokens.
+- Do not perform automatic Nextcloud major upgrades or migrate to AIO without a
+  separate comparison, rollback, and explicit durable decision.
+- Nextcloud Passwords is not a group vault; do not introduce Passbolt for the
+  web-only Vaultwarden MVP.
+- Do not claim GDPR/compliance, 2FA enforcement, external reachability, or
+  runtime health unless verified in the actual relevant environment.
+- Never use direct SQL writes against Nextcloud. Use OCC, WebDAV, OCS, or a
+  documented minimum manual action.
+- Do not publish the unprotected Visual PBX proof of concept.
 
-Erstelle ein idempotentes Script oder eine dokumentierte OCC-Konfiguration für:
+## Validation expectations
 
-- Talk
-- Mail
-- Calendar
-- Contacts
-- Tasks
-- Notes
-- Collectives
-- Deck
-- Tables
-- Forms
-- Nextcloud Office
+- `docker compose config -q` for the base and every new profile/overlay;
+- `bash -n scripts/*.sh tests/*.sh` and `./scripts/check-secrets.sh --tracked`;
+- runtime start/health/backup/empty-target restore for an isolated Vaultwarden
+  profile using synthetic data only;
+- idempotent HR Lite reconciliation and group/permission tests on an approved
+  disposable Nextcloud instance;
+- default-disabled Visual PBX contract check; and
+- existing Nextcloud host checks only on the configured host, never faked in CI.
 
-Das Script muss App-Kompatibilität prüfen, installierte Versionen dokumentieren, bei Fehlern abbrechen und keine Major-Upgrades erzwingen. Lege ausschließlich erfundene Demo-Daten an.
-
-### 3. Collabora Online integrieren
-
-- Verwende einen dedizierten Collabora-Container/Service; Built-in CODE höchstens lokal.
-- Führe ihn optional über ein Compose-Profil oder einen getrennten Compose-Overlay ein.
-- Integriere Caddy/WebSockets korrekt und beschränke erlaubte WOPI-Hosts auf die Nextcloud-Domain.
-- Teste Textdokument, Tabelle, gleichzeitiges Bearbeiten, Neustart und Dateiversionen.
-
-### 4. Nextcloud Talk stufenweise produktionsfähig machen
-
-- Zuerst Chat und kleine P2P-Anrufe testen.
-- Danach TURN für restriktive NAT-/Mobilnetze einführen und von einem wirklich externen Netz testen.
-- High-Performance-Backend erst anschließend ergänzen; getrennte Secrets für TURN, Signaling und intern.
-- Dokumentiere Ports, Reverse Proxy, WebSockets, Firewall und Testkommandos.
-- Keine Recording- oder SIP-Brücke im MVP.
-
-### 5. mailcow als separaten Baustein integrieren
-
-- Prüfe Zielhost, statische öffentliche IP, Port 25, PTR/rDNS und DNS-Verwaltung vor der Installation.
-- Für Produktion bevorzugt eine separate VM/VPS; der NUC mit 16 GiB ist kein belastbarer Standardhost für Nextcloud + Collabora + Talk + vollständiges mailcow gleichzeitig.
-- Folge dem Upstream-Installations-/Updateprozess; pinne Version/Commit und dokumentiere Backup/Restore.
-- Konfiguriere A/MX, PTR, SPF, DKIM und DMARC.
-- Binde Nextcloud Mail über IMAP/SMTP an.
-- Nutze SOGo nur als Fallback-Webmail; keine parallele Kalender-/Kontaktquelle etablieren.
-- In Demo-Umgebungen keinen echten externen Mailversand aktivieren.
-
-### 6. Gemeinsamer Zugang erst zum Schluss
-
-- Prüfe OIDC/SSO erst, wenn alle Kernmodule einzeln stabil sind.
-- Kein LDAP-/Keycloak-/Authentik-Overengineering im ersten Slice.
-- Ein gemeinsames Portal darf nur auf gesunde Dienste verlinken und keine Passwörter enthalten.
-
-## Qualitätskriterien
-
-- Bestehender Nextcloud-Core bleibt nach jeder Stufe gesund.
-- Jede Komponente ist separat startbar, aktualisierbar, sicherbar und entfernbar.
-- `docker compose config -q`, Shell-Syntax, Healthcheck und passende externe End-to-End-Tests sind dokumentiert und ausgeführt.
-- Ein kompletter Demo-Flow funktioniert: Datei hochladen → gemeinsam bearbeiten → in Talk teilen → Aufgabe/Notiz anlegen → Mail im Nextcloud-Mailclient anzeigen.
-- Abschlussbericht: Änderungen, Tests, Ressourcenverbrauch, offene Netzwerk-/DNS-Risiken und nächste drei Schritte.
+When a component cannot be checked without unavailable deployment authority,
+document the exact blocker and do not substitute static success for a runtime
+claim. Update `.agent/STATE.md`, `.agent/TODO.md`, and architecture handoff
+files to match verified reality before ending substantial work.

@@ -2,6 +2,12 @@
 .env.*
 !.env.example
 
+# Host-local Office module configuration and generated fictional demo secrets
+config/office-modules.env
+.vaultwarden.env
+.hr-lite-demo.env
+integrations/visual-pbx.env
+
 # Runtime data and locally created backups
 backups/
 *.log

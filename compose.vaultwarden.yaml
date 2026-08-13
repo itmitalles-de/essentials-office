@@ -1,0 +1,37 @@
+# Optional Vaultwarden module. The base compose.yaml remains the complete
+# Nextcloud core and does not start this service unless its profile is selected.
+services:
+  vaultwarden:
+    image: vaultwarden/server:1.37.1
+    container_name: office-vaultwarden
+    profiles: ["vaultwarden"]
+    restart: unless-stopped
+    stop_grace_period: 1m
+    user: "1000:1000"
+    env_file:
+      - ${VAULTWARDEN_ENV_FILE:-.vaultwarden.env}
+    environment:
+      ROCKET_ADDRESS: 0.0.0.0
+      ROCKET_PORT: "8080"
+      DATABASE_URL: sqlite:///data/db.sqlite3
+      DATA_FOLDER: /data
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ${VAULTWARDEN_DATA_DIR:-/srv/vaultwarden/data}:/data
+    networks:
+      proxy_net:
+        aliases:
+          - vaultwarden
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 1m

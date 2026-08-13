@@ -1,67 +1,92 @@
-# AGENTS.md
+# Repository agent guide
 
-## Produktgrenze
+## Purpose and boundaries
 
-Dieses Repository ist **Workspace Suite**, Hauptprojekt 3 von 3. Die Domain `cloud.itmitalles.de` bleibt bestehen; der Repository-Slug soll administrativ später `workspace-suite` heißen.
+This repository deploys **Essentials+ Office**, the Essentials Plus collaboration product,
+currently a reproducible Nextcloud core
+for `cloud.itmitalles.de`. The repository is persistent project memory; a chat
+or agent session is temporary working memory.
 
-Hierher gehören:
+Files, Calendar, Contacts, Tasks, Talk, Office, and related Nextcloud apps are
+in scope. Freelancer billing and ERP/shop functions are not. mailcow is a
+separate upstream-operated subsystem even when it is integrated with Nextcloud
+Mail; never fold its lifecycle into this Compose project.
 
-- Nextcloud Files, Calendar, Contacts, Tasks und Mail
-- Nextcloud Talk einschließlich separater TURN-/HPB-Planung
-- Nextcloud Office mit Collabora Online
-- Notes, Collectives, Deck, Tables und Forms
-- mailcow als eigenständig betriebener Mail-Baustein
-- Backup, Restore, Monitoring, DNS, Reverse Proxy und später optional SSO
+## Startup
 
-Nicht hierher gehören Freelancer-Abrechnung oder Shop-/ERP-Funktionen.
+1. Inspect `git status` and preserve all existing worktree changes.
+2. Read `.agent/STATE.md` for the last verified repository and runtime state.
+3. Read `.agent/TODO.md` when continuing existing work.
+4. Read `.agent/DECISIONS.md` or `.agent/ARCHITECTURE.md` only when relevant.
+5. Inspect recent relevant commits and the specific implementation area needed.
+6. Check open pull requests before treating branch-only work as implemented.
 
-## Bestehende Grundlage
+For broad product work, read `README.md` and `docs/ARCHITECTURE.md`. Demand-load
+operational documents and scripts only for the component being changed.
 
-Der aktuelle Nextcloud-Core auf dem NUC ist validiert und darf nicht beiläufig ersetzt werden:
+## Current operational boundary
 
-- Nextcloud 34, PostgreSQL 17, Redis 7, separater Cron
-- gemeinsamer Caddy auf `proxy_net`
-- Checkout auf dem NUC unter `/opt/nextcloud`
-- persistente Daten unter `/srv/nextcloud`
-- Secrets ausschließlich lokal in `.env`
-- Domain derzeit noch nicht öffentlich live
-- lokales Backup und Wegwerf-Restore getestet; verschlüsseltes Offsite-Backup
-  ist bis unmittelbar vor der ersten Nutzung echter Daten zurückgestellt
+- Preserve the existing Nextcloud 34, PostgreSQL 17, Redis 7, and cron core.
+- Preserve `/opt/nextcloud`, `/srv/nextcloud`, shared Caddy, and `proxy_net`.
+- Treat runtime facts in documentation as dated observations, not live proof.
+- Keep `implemented`, `planned`, and `blocked` states explicit.
+- Do not adopt Nextcloud AIO without a migration comparison, rollback, and an
+  explicit durable decision.
+- Do not perform automatic major-version upgrades.
 
-Keine Migration zu Nextcloud AIO ohne eigenen Vergleich, Rollback und ausdrückliche Entscheidung.
+## Safety and data
 
-## Architekturregeln
+- Never commit `.env`, credentials, private keys, backups, mailboxes, or user data.
+- Keep generated service secrets local and mode `0600`; see `secrets/README.md`.
+- Before persistent-data changes, define backup, restore, and rollback steps.
+- Do not recursively change ownership on a populated data tree.
+- Do not expose PostgreSQL or Redis host ports.
+- Reconcile the complete shared Caddy configuration before any reload.
+- Keep demo data fictional and demo mail delivery non-production.
 
-- Nextcloud bleibt kanonisch für Kalender, Kontakte und Aufgaben.
-- SOGo ist optionaler Mail-/Fallback-Client, kein zweites führendes Groupware-System.
-- Collabora läuft als eigener Container/Service; Built-in CODE nur für lokale Tests.
-- Talk-App, TURN und High-Performance-Backend sind getrennte Ausbaustufen.
-- mailcow bleibt ein eigener Upstream-Stack mit eigenem Lifecycle. Nicht in `compose.yaml` hineinkopieren.
-- Mailproduktion nur mit geeigneter öffentlicher Erreichbarkeit, Port 25, PTR/rDNS sowie SPF, DKIM und DMARC.
-- Kein Secret, reales Postfach oder echter Kundendatensatz im Repository oder in Demos.
+## Working conventions
 
-## Arbeitsweise
+- Inspect before editing and preserve the existing deployment topology.
+- Add modules as optional profiles, overlays, or clearly separate stacks.
+- Keep mailcow on its own pinned upstream lifecycle and backup path.
+- Keep Nextcloud canonical for calendars, contacts, and tasks; SOGo is only an
+  optional mail/fallback client.
+- Use targeted `rg` searches and narrow file reads.
+- Avoid recursive documentation ingestion, giant log dumps, and rereading large
+  files when a focused excerpt is sufficient.
+- Run scoped checks first. Use isolated or subagent investigations, where
+  supported, only for large independent areas such as mail or Talk.
+- Record durable findings in `.agent/` rather than leaving them only in chat.
 
-1. Vor Änderungen README, Compose und alle betroffenen Scripts vollständig lesen.
-2. Bestehende NUC-Pfade, Volumes, Container-Namen und Caddy-Routen erhalten.
-3. Jede neue Komponente über ein optionales Profil oder einen klar getrennten Stack einführen.
-4. Vor Änderungen an persistenten Daten: Backup, Restore-Schritt und Rollback definieren.
-5. Keine automatische Major-Version-Aktualisierung.
-6. Demo- und Produktionsmodus klar trennen.
-7. Der aktuelle Slice priorisiert einen idempotenten IaC-Deploy aus dem
-   Repository; Offsite-Backup bleibt ein dokumentiertes Gate vor echten Daten.
+## Validation
 
-## Verifikation
-
-Mindestens passend zur Änderung:
+Use checks proportional to the change:
 
 - `docker compose config -q`
 - `bash -n scripts/*.sh`
-- `./scripts/healthcheck.sh`; bei geeigneter Umgebung zusätzlich `--file-roundtrip`
-- Neustart- und Persistenztest
-- Externe Prüfung von TLS/DNS/WebDAV/CalDAV
-- Bei Talk: Test aus einem fremden Mobil-/NAT-Netz, TURN UDP und TCP
-- Bei Collabora: gemeinsames Bearbeiten je eines Textdokuments und einer Tabelle
-- Bei mailcow: DNS, PTR, SMTP/IMAP/TLS, SPF/DKIM/DMARC und Restore
+- `./scripts/healthcheck.sh` on the configured host
+- `./scripts/healthcheck.sh --file-roundtrip` for an authenticated persistence test
 
-Fertig bedeutet: bestehender Nextcloud-Kern bleibt gesund, neue Module sind optional/reproduzierbar, Backups und Rollback sind dokumentiert und reale Daten bleiben geschützt.
+For operational changes, also test restart persistence and the documented
+rollback. DNS, TLS, DAV, Talk, TURN, Collabora, and mail checks require their
+component-specific external tests; do not claim them from static validation.
+
+## Handoff
+
+Before ending substantial work:
+
+1. Validate the changed scope and record what was actually run.
+2. Update `.agent/STATE.md` with concise verified reality.
+3. Update `.agent/TODO.md`, the authoritative repository task handoff.
+4. Record a durable decision in `.agent/DECISIONS.md` only when one was made.
+5. Update `.agent/ARCHITECTURE.md` only when the implemented architecture changed.
+
+Assume the next session has no useful memory of the current conversation.
+
+When visible context use reaches roughly 50-70%, prefer a coherent stopping
+point, validate it, update the handoff, and continue in a fresh session. Do not
+interrupt an atomic change merely to satisfy that guideline.
+
+For an unspecified continuation request, read the state and TODO, inspect Git
+status and recent relevant commits, then continue the highest-priority unfinished
+task without redoing completed work.

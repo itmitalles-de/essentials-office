@@ -1,0 +1,123 @@
+{
+  "contractVersion": 1,
+  "product": {
+    "name": "Office",
+    "brand": "Essentials Plus"
+  },
+  "adminCenter": {
+    "ownerGroup": "admin",
+    "implementation": "Nextcloud Collectives page plus group-restricted External Sites links",
+    "rule": "Administrators see the entire catalog; other users see only links and apps that are both enabled and assigned to one of their groups."
+  },
+  "themes": [
+    {
+      "id": "collaboration",
+      "title": "Collaboration",
+      "modules": ["nextcloud-core", "collabora", "talk", "mail"]
+    },
+    {
+      "id": "knowledge",
+      "title": "Knowledge and intranet",
+      "modules": ["intranet-lite"]
+    },
+    {
+      "id": "people",
+      "title": "People operations",
+      "modules": ["hr-lite"]
+    },
+    {
+      "id": "security",
+      "title": "Security and access",
+      "modules": ["vaultwarden"]
+    },
+    {
+      "id": "integrations",
+      "title": "External integrations",
+      "modules": ["visual-pbx"]
+    }
+  ],
+  "modules": [
+    {
+      "id": "nextcloud-core",
+      "title": "Files and groupware",
+      "kind": "core",
+      "configKey": "OFFICE_MODULE_NEXTCLOUD_CORE_ENABLED",
+      "defaultEnabled": true,
+      "audiences": ["all-authenticated"],
+      "health": "nextcloud-core",
+      "dataPolicy": "canonical data remains in the existing Nextcloud PostgreSQL and filesystem stores"
+    },
+    {
+      "id": "collabora",
+      "title": "Office documents",
+      "kind": "external-service",
+      "configKey": "OFFICE_MODULE_COLLABORA_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["office-user"],
+      "health": "https",
+      "dataPolicy": "separate Collabora process and no shared database or secrets"
+    },
+    {
+      "id": "talk",
+      "title": "Chat and meetings",
+      "kind": "external-service",
+      "configKey": "OFFICE_MODULE_TALK_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["office-user"],
+      "health": "https",
+      "dataPolicy": "Talk, TURN, and HPB remain staged optional components"
+    },
+    {
+      "id": "mail",
+      "title": "Mail",
+      "kind": "external-service",
+      "configKey": "OFFICE_MODULE_MAIL_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["office-user"],
+      "health": "https",
+      "dataPolicy": "mailcow stays a separately managed stack or host"
+    },
+    {
+      "id": "intranet-lite",
+      "title": "Intranet Lite",
+      "kind": "nextcloud-composite",
+      "configKey": "OFFICE_MODULE_INTRANET_LITE_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["office-user"],
+      "health": "intranet-lite-script",
+      "components": ["collectives", "circles", "dashboard", "announcementcenter"],
+      "dataPolicy": "Collectives content remains in Nextcloud; do not add Wiki.js or BookStack as a parallel default"
+    },
+    {
+      "id": "hr-lite",
+      "title": "HR Lite",
+      "kind": "nextcloud-workflow",
+      "configKey": "OFFICE_MODULE_HR_LITE_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["hr-admin", "manager", "employee"],
+      "health": "hr-lite-script",
+      "components": ["tables", "forms", "deck", "calendar", "collectives"],
+      "dataPolicy": "synthetic demonstration data only; no payroll, ATS, time tracking, or direct database writes"
+    },
+    {
+      "id": "vaultwarden",
+      "title": "Password vault",
+      "kind": "external-service",
+      "configKey": "OFFICE_MODULE_VAULTWARDEN_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["office-user"],
+      "health": "vaultwarden-script",
+      "dataPolicy": "separate SQLite data, backups, and secrets; no Nextcloud Passwords group vault"
+    },
+    {
+      "id": "visual-pbx",
+      "title": "Visual PBX",
+      "kind": "external-integration",
+      "configKey": "OFFICE_MODULE_VISUAL_PBX_ENABLED",
+      "defaultEnabled": false,
+      "audiences": ["office-user"],
+      "health": "https",
+      "dataPolicy": "separate itmitalles-de/visual-pbx product, no shared database, secrets, source merge, or public proxy"
+    }
+  ]
+}
