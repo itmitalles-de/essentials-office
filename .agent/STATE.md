@@ -20,10 +20,10 @@ repository are dated evidence only, not a current live verification.
   `bb3d79e`, `b888dcb`, and `b105280`.
 - Draft PR #1 had no review threads. Its static CI failure was independently
   traced to ShellCheck SC2015; its history gitleaks job passed at that time.
-- The consolidated branch was pushed through `d7f70ac`; draft PR #2
+- The consolidated branch was pushed through `2bea9e7`; draft PR #2
   (`Build Essentials+ Office modular control plane`) supersedes PR #1. PR #1
-  remains open and unchanged; neither PR was merged. Later CI fixes are local
-  until their next successful push.
+  remains open and unchanged; neither PR was merged. The separate pause-handoff
+  commit created after that code push is intentionally local until work resumes.
 
 ## Implemented on this branch
 
@@ -44,6 +44,11 @@ repository are dated evidence only, not a current live verification.
 - Synthetic HR Lite and Intranet Lite fixtures and idempotent OCC/WebDAV/OCS
   reconciliation/verification paths are present. They use fictional identities
   and supported application interfaces, not direct Nextcloud SQL changes.
+- Nextcloud-protected app types that reject group enablement are declared
+  `platform-global`. The Office portal and content permissions remain scoped;
+  logical deactivation disables an app when no other active module needs it and
+  never deletes its data. This applies to the relevant Intranet, HR, Talk, and
+  Collabora app declarations.
 - Talk TURN configuration no longer places the shared secret in process
   arguments. Redis authentication no longer places its password on the command
   line. Backup metadata now records repository/app/image evidence with secrets
@@ -60,7 +65,7 @@ repository are dated evidence only, not a current live verification.
   Python/JavaScript/PHP syntax, JSON/XML, Caddy validation, module invariants,
   unsafe-pattern checks, and update-major policy.
 - `actionlint` passed for the expanded CI workflow. PR #2's full-history
-  Gitleaks job passed at commit `d7f70ac`.
+  Gitleaks job passed for head `2bea9e7` before this pause.
 - Isolated Collabora image/health/discovery/restart testing passed. This was not
   a full WOPI document edit test.
 - Isolated TURN authenticated allocation and secret-rotation testing passed;
@@ -78,6 +83,15 @@ repository are dated evidence only, not a current live verification.
   editor/reader roles, the confidential-area boundary, and OCS search-provider
   availability. These targeted runs do not replace the pending combined
   backup/restore and deactivation-preservation run.
+- A targeted disposable Intranet run after the protected-app fix passed module
+  activation, health gates, group-union visibility for restrictable apps,
+  logical disable with WebDAV data preservation, reactivation, metrics, app
+  restart, and a second semantically idempotent deployment.
+- A targeted disposable Talk run after the protected-app and OCS-v2 fixes passed
+  room creation, participant invitation, message send/read, outsider rejection,
+  logical disable/reactivation with message preservation, app restart, and a
+  second semantically idempotent deployment. This is not evidence of real media
+  quality or NAT traversal.
 - The module-control run exposed an overly broad secret-name rejection for the
   declared boolean Calls attestation `sipCredentialStorageReady`. The command
   now relies on the manifest schema's declared typed keys as its allow-list;
@@ -90,12 +104,15 @@ repository are dated evidence only, not a current live verification.
 ## Explicitly not completed in this paused stage
 
 - The complete disposable test with browser Admin Center, recovery, HR Lite,
-  Intranet Lite, and Talk flags did not finish after the latest changes. It
-  passed core/app setup plus targeted HR and Intranet stages, then exposed the
-  Calls attestation bug above. That fix was applied, but the subsequent run was
-  intentionally interrupted for this pause before module controls, browser E2E,
-  Talk, second deployment, persistence, Nextcloud restore, and final cleanup
-  assertions could complete.
+  Intranet Lite, and Talk flags has not yet passed on the exact final code head.
+  Run `31720924809` for `2bea9e7` completed with static validation, full-history
+  secret scan, and isolated modules green. The combined job reached the module
+  controls and then failed at the healthy-core metrics assertion. Exporter and
+  assertion formats agree; the direct `occ | rg -q` pipeline was nondeterministic
+  under `pipefail` because `rg` can close the pipe after its first match. The
+  harness now captures the complete metrics output before asserting it. Browser
+  Admin Center, combined redeployment, and Nextcloud recovery still require the
+  immutable result of the follow-up run.
 - Collabora create/open/edit/reload through WOPI was not automated or verified;
   only service/discovery/restart behavior was tested.
 - Real Talk browser media quality, NAT traversal, audio/video, and HPB were not
@@ -104,17 +121,19 @@ repository are dated evidence only, not a current live verification.
   mail delivery were not verified; only the external TLS health contract exists.
 - HR Lite and Intranet Lite app-specific objects that lack stable provisioning
   APIs were not accepted manually. No manual UI acceptance is part of this task.
-- Full-history gitleaks and GitHub CI for this paused commit have not yet run.
+- GitHub CI for the local handoff and metrics-race fix has not run; they are not
+  yet pushed.
 - README/architecture/operations/Codex prompt/changelog branding consolidation,
   `docs/NICE_TO_HAVE.md`, and `docs/VERIFICATION_MATRIX.md` are still unfinished.
 - Draft PR #2 is open and deliberately remains a draft. No PR was merged.
+- Local `main` was not advanced or synchronized to the feature branch.
 - Nothing was verified on the NUC, from the public Internet, or in production.
 
 ## Resume point
 
-Start with `.agent/TODO.md`. First rerun the complete disposable suite; the next
-unproven boundary is module controls after the `sipCredentialStorageReady` fix,
-followed by browser Admin Center, Talk, redeployment, persistence, and recovery.
-Then run the final history scan and update documentation only from those results.
-Split subsequent work into focused commits, push the current branch to draft PR
-#2, and do not merge while required checks or gates are open.
+Start with `.agent/TODO.md`. Push the local handoff and deterministic metrics
+assertion, then inspect the immutable follow-up GitHub Actions run for its exact
+head. Continue from its first proven failure, or record the browser/recovery
+evidence if it passes. Documentation and the verification matrix remain a later
+workstream. The user explicitly authorized commit, merge, push, and sync in the
+current continuation; production remains out of scope.

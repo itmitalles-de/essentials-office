@@ -13,15 +13,19 @@ task list, infer live state from dated evidence, or touch production systems.
   Center, recovery, HR Lite, Intranet Lite, and Talk flows. Prove second-run
   idempotence, permissions, restart persistence, WebDAV data/share recovery,
   content/volume preservation across logical module deactivation, and complete
-  resource cleanup. The interrupted run proved core/app setup and
-  targeted HR/Intranet reconciliation; resume by proving module controls after
-  the `sipCredentialStorageReady` allow-list fix, then browser E2E, Talk,
-  redeployment, persistence, and recovery.
+  resource cleanup. GitHub Actions run `31720924809` for exact PR head `2bea9e7`
+  passed static validation, full-history secret scan, and isolated modules. Its
+  combined job reached module controls and failed at a pipefail-sensitive
+  `occ | rg -q` metrics assertion. The harness now captures complete metrics
+  output before matching it. Targeted Intranet and Talk flows pass activation,
+  permissions, disable preservation, restart, and second deployment; browser
+  Admin Center and combined recovery still need the follow-up run result.
 - [ ] Correct every failure found by that combined run. Do not weaken assertions
   merely to make the suite green, and do not claim app-specific objects that
   could not be provisioned through supported interfaces.
-- [ ] Run the final static suite, ShellCheck, actionlint, full-history gitleaks,
-  JSON/YAML/XML/template checks, and inspect the complete diff against `main`.
+- [ ] Inspect the complete diff against `main`. The exact-tree local static
+  suite, ShellCheck container, actionlint, JSON/XML/template checks, and PR-head
+  full-history gitleaks passed before this pause.
 - [ ] Update visible branding and documentation to **Essentials+ Office**:
   README, architecture, operations, backup/restore, security, module overview,
   `docs/CODEX_PROMPT.md`, changelog, agent decisions/architecture, and handoff.
@@ -30,10 +34,9 @@ task list, infer live state from dated evidence, or touch production systems.
   NUC, public external, and production. Mark unsupported claims as unverified.
 - [ ] Create `docs/NICE_TO_HAVE.md` containing only the requested future items;
   add no code, stubs, images, or dependencies for them.
-- [ ] Commit and push the remaining fixes to
-  `agent/essentials-office-autonomous` and update superseding draft PR #2. Keep
-  it draft while required checks or external gates remain; do not merge PR #1
-  or PR #2 prematurely.
+- [ ] Push the local pause-handoff commit plus any later focused fixes to
+  `agent/essentials-office-autonomous`. Code fixes are already pushed through
+  `2bea9e7`; superseding PR #2 remains draft and neither PR was merged.
 
 ## Functional gaps to resolve or document honestly
 
@@ -41,12 +44,16 @@ task list, infer live state from dated evidence, or touch production systems.
   reproducibly without weakening the service boundary. Current evidence covers
   only health, discovery, host allow-list, and restart recovery.
 - [ ] Verify Talk P2P room/participant/message/permission flows in the combined
-  run. Keep TURN optional; implement HPB only if cleanly reproducible and
-  separated. Never infer real NAT/media quality from a local test.
+  run. The targeted disposable flow passes, including disable/reactivation data
+  preservation; confirm it in run `31720924809`. Keep TURN optional; implement
+  HPB only if cleanly reproducible and separated. Never infer real NAT/media
+  quality from a local test.
 - [ ] Verify HR Lite fictional directory, onboarding/offboarding, absence,
   responsibilities, templates, protected files, and least-privilege groups.
 - [ ] Verify Intranet Lite fictional content, editors/readers, confidential area,
   search/API availability, backup/restore, and content-preserving deactivation.
+  Targeted activation/deactivation and content preservation pass; combined
+  Nextcloud restore remains unconfirmed at this pause.
 - [ ] Exercise Nextcloud Mail configuration against the synthetic TLS IMAP/SMTP
   server or document the smallest supported remaining step. Do not embed mailcow.
 - [ ] Verify metrics, cron freshness, backup age, last restore evidence,
