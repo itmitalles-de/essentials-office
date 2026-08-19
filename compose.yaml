@@ -2,7 +2,7 @@ name: nextcloud
 
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
     container_name: ${DB_CONTAINER_NAME:-nextcloud-db}
     restart: unless-stopped
     stop_grace_period: 1m
@@ -24,7 +24,7 @@ services:
       start_period: 30s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.10-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     container_name: ${REDIS_CONTAINER_NAME:-nextcloud-redis}
     restart: unless-stopped
     stop_grace_period: 30s
@@ -53,7 +53,7 @@ services:
       start_period: 10s
 
   app:
-    image: nextcloud:34-apache
+    image: nextcloud:34.0.2-apache@sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329
     container_name: ${APP_CONTAINER_NAME:-nextcloud-app}
     restart: unless-stopped
     stop_grace_period: 1m
@@ -99,7 +99,7 @@ services:
       start_period: 2m
 
   cron:
-    image: nextcloud:34-apache
+    image: nextcloud:34.0.2-apache@sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329
     container_name: ${CRON_CONTAINER_NAME:-nextcloud-cron}
     restart: unless-stopped
     stop_grace_period: 1m

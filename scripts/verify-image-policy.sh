@@ -16,9 +16,15 @@ for command in docker grep sort; do
 done
 [ -f "$COMPOSE_FILE" ] || die "missing Compose file: $COMPOSE_FILE"
 mapfile -t images < <(docker compose -f "$COMPOSE_FILE" config --images | sort -u)
-expected=(nextcloud:34-apache postgres:17-alpine redis:7-alpine)
-[ "${#images[@]}" -eq "${#expected[@]}" ] || die 'base Compose contains an unexpected image count'
-for image in "${expected[@]}"; do
-  printf '%s\n' "${images[@]}" | grep -Fxq "$image" || die "required approved major image is missing: $image"
+[ "${#images[@]}" -eq 3 ] || die 'base Compose contains an unexpected image count'
+patterns=(
+  '^nextcloud:34\.[0-9]+\.[0-9]+-apache@sha256:[0-9a-f]{64}$'
+  '^postgres:17\.[0-9]+-alpine@sha256:[0-9a-f]{64}$'
+  '^redis:7\.[0-9]+\.[0-9]+-alpine@sha256:[0-9a-f]{64}$'
+)
+labels=('Nextcloud 34 patch' 'PostgreSQL 17 minor' 'Redis 7 patch')
+for index in "${!patterns[@]}"; do
+  matches=$(printf '%s\n' "${images[@]}" | grep -Ec "${patterns[$index]}" || true)
+  [ "$matches" -eq 1 ] || die "required reviewed ${labels[$index]} tag plus digest is missing"
 done
-printf 'verify-image-policy: approved Nextcloud 34, PostgreSQL 17, and Redis 7 major boundaries passed\n'
+printf 'verify-image-policy: exact digests and approved Nextcloud 34, PostgreSQL 17, and Redis 7 boundaries passed\n'
