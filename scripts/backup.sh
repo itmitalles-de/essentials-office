@@ -131,6 +131,24 @@ fi
 docker compose --project-directory "$PROJECT_DIR" --env-file "$PROJECT_DIR/.env" \
   -f "$SOURCE_COMPOSE" config -q
 
+# Capture runtime provenance while all four services are still running. Cron is
+# deliberately stopped below for the consistent snapshot and therefore cannot
+# be inventoried later with the running-only `docker compose ps -q` default.
+app_versions=$(docker compose exec -T -u www-data app php occ app:list --output=json)
+image_metadata=$(docker compose --project-directory "$PROJECT_DIR" --env-file "$PROJECT_DIR/.env" \
+  -f "$SOURCE_COMPOSE" config --images | sort -u | while IFS= read -r image; do
+  docker image inspect "$image" --format '{{json .}}' \
+    | jq -c --arg requested "$image" \
+      '{requested: $requested, imageId: .Id, repoDigests: (.RepoDigests // [] | sort)}'
+done | jq -s .)
+running_image_metadata=$(for service in db redis app cron; do
+  container_id=$(docker compose ps -q "$service")
+  [ -n "$container_id" ] || die "running container is missing at backup start: $service"
+  docker inspect "$container_id" --format '{{json .}}' |
+    jq -c --arg service "$service" \
+      '{service: $service, imageReference: .Config.Image, imageId: .Image}'
+done | jq -s .)
+
 docker compose exec -T -u www-data app php occ status --output=json >/dev/null
 docker compose exec -T -u www-data app php occ maintenance:mode --on >/dev/null
 MAINTENANCE_ENABLED=true
@@ -178,20 +196,6 @@ cp "$SOURCE_ENV_EXAMPLE" "$WORK_DIR/env.example"
 cp "$SOURCE_CADDY" "$WORK_DIR/Caddyfile.example"
 printf '%s\n' "$REPOSITORY_COMMIT" >"$WORK_DIR/repository-commit.txt"
 chmod 0600 "$WORK_DIR/repository-commit.txt"
-app_versions=$(docker compose exec -T -u www-data app php occ app:list --output=json)
-image_metadata=$(docker compose --project-directory "$PROJECT_DIR" --env-file "$PROJECT_DIR/.env" \
-  -f "$SOURCE_COMPOSE" config --images | sort -u | while IFS= read -r image; do
-  docker image inspect "$image" --format '{{json .}}' \
-    | jq -c --arg requested "$image" \
-      '{requested: $requested, imageId: .Id, repoDigests: (.RepoDigests // [] | sort)}'
-done | jq -s .)
-running_image_metadata=$(for service in db redis app cron; do
-  container_id=$(docker compose ps -q "$service")
-  [ -n "$container_id" ] || die "running container is missing for backup evidence: $service"
-  docker inspect "$container_id" --format '{{json .}}' |
-    jq -c --arg service "$service" \
-      '{service: $service, imageReference: .Config.Image, imageId: .Image}'
-done | jq -s .)
 if [ "$SOURCE_MODE" = committed-tree ]; then
   rm -f -- "$SOURCE_COMPOSE" "$SOURCE_ENV_EXAMPLE" "$SOURCE_CADDY"
 fi
@@ -205,7 +209,7 @@ jq -n --arg createdAt "$STAMP" --arg repositoryCommit "$REPOSITORY_COMMIT" \
 printf '%s\n' \
   'Database restore source: nextcloud.pg.dump (custom pg_dump format).' \
   'Filesystem archive includes html and data; PostgreSQL is represented by the logical dump and Redis is intentionally rebuilt empty.' \
-  'compose.yaml and its redacted render describe the repository source commit recorded by this backup; versions.json also records the running container images.' \
+  'compose.yaml and its redacted render describe the repository source commit recorded by this backup; versions.json also records the container images running at backup start.' \
   'The live .env file is intentionally not included. Restore it from protected secret storage.' \
   >"$WORK_DIR/README.txt"
 (
