@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate an Office module before an administrator makes it visible to users.
+# Validate an Essentials+ Office module before an administrator makes it visible to users.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

@@ -1,13 +1,14 @@
-# Visual PBX integration boundary
+# Essentials+ Calls external integration boundary
 
-Visual PBX belongs to the separate `itmitalles-de/visual-pbx` product. Office
-contains no PBX service, source merge, database, secret, Docker host port, or
-Caddy route. `integrations/visual-pbx.env.example` describes an optional,
+The backing Visual PBX belongs to the separate `itmitalles-de/visual-pbx`
+product. Essentials+ Office exposes it only as **Essentials+ Calls**. This
+repository contains no PBX service, source merge, database, secret, Docker host
+port, or Caddy route. `integrations/visual-pbx.env.example` describes an optional,
 disabled portal-link/health-check contract only.
 
 ## Release gates
 
-Do not set `VISUAL_PBX_ENABLED=true` or publish an Office link until the Visual
+Do not set `VISUAL_PBX_ENABLED=true` or publish an Essentials+ Office link until the Visual
 PBX product independently has:
 
 1. authentication and role enforcement;
@@ -26,6 +27,6 @@ cp integrations/visual-pbx.env.example integrations/visual-pbx.env
 ```
 
 With an enabled contract, run `--check-health` before making a link visible.
-OIDC/SSO and groups mapping are later architecture stages, not part of this
-integration. The currently unprotected PBX proof of concept must never be
-publicly proxied through Office.
+OIDC/SSO and group mapping are outside this integration. The currently
+unprotected PBX proof of concept must never be
+publicly proxied through Essentials+ Office.

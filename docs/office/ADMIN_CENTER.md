@@ -1,14 +1,14 @@
-# Office Admin Center
+# Essentials+ Office Admin Center
 
-Office is the Essentials Plus collaboration product. The Admin Center is a
+Essentials+ Office is the collaboration product. The Admin Center is a
 thematically grouped administrative catalog, defined by
 [`office-modules.json`](../../office-modules.json). It is intentionally a
 Nextcloud configuration pattern, not another always-running portal service.
 
 ## Visibility contract
 
-1. The `admin` group sees the complete catalog in the restricted **Office Admin
-   Center** Collectives page and can operate the module checks.
+1. The `admin` group sees the complete catalog in the restricted **Essentials+
+   Office Admin Center** Collectives page and can operate the module checks.
 2. Every optional module begins disabled in `config/office-modules.env`.
 3. Before a module is made visible, its administrator sets its config flag,
    runs `scripts/office-module-preflight.sh --module <id>`, and records the
@@ -31,7 +31,7 @@ There is no stable OCC provisioning interface for Collectives pages or the
 External Sites catalog. After `Collectives` is installed, perform these small,
 reproducible manual actions:
 
-1. Create a Collective called **Office Admin Center** and restrict membership
+1. Create a Collective called **Essentials+ Office Admin Center** and restrict membership
    to the built-in `admin` group.
 2. Copy the thematic tables from
    [`office-admin-center/CATALOG.md`](../../office-admin-center/CATALOG.md)
@@ -53,11 +53,12 @@ These four checks are the minimum acceptance test for the Admin Center.
 | Knowledge and intranet | Intranet Lite |
 | People operations | HR Lite |
 | Security and access | Vaultwarden |
-| External integrations | Visual PBX |
+| External integrations | Essentials+ Calls |
 
 `nextcloud-core` is the only default-active module. Collabora, Talk, Mail,
-Vaultwarden, HR Lite, Intranet Lite, and Visual PBX remain independent,
-optional modules. mailcow keeps its separate stack or host.
+Vaultwarden, HR Lite, Intranet Lite, and Essentials+ Calls remain independent,
+optional modules. No mail platform is included; Mail remains an IMAP/SMTP
+integration boundary.
 
 ## Activation and deactivation
 

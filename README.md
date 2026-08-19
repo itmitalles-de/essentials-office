@@ -1,64 +1,53 @@
-# Workspace Suite
+# Essentials+ Office
 
-Open-source collaboration platform and self-hosted alternative to Microsoft 365 / Google Workspace. The existing production-grade Nextcloud foundation is deployed at `https://cloud.itmitalles.de`; the repository grows around that foundation without replacing it.
+Essentials+ Office is the self-hosted collaboration product in
+[`itmitalles-de/essentials-office`](https://github.com/itmitalles-de/essentials-office).
+Nextcloud is its core. The public service hostname remains
+`cloud.itmitalles.de`; stable runtime paths and identifiers are listed in
+[the compatibility register](docs/COMPATIBILITY_IDENTIFIERS.md).
 
-
-
-> **Main product 3 of 3.** The product name is **Workspace Suite**. The public Nextcloud hostname remains `cloud.itmitalles.de`; the repository should later be renamed administratively to `itmitalles-de/workspace-suite`.
+The repository is operationally strong but is **not accepted as production
+ready**. The current deployed revision, configuration drift, real encrypted
+offsite snapshot, independent restore, operator-owned RPO/RTO, and current
+public ingress must be proven independently. Repository or CI success does not
+close those gates.
 
 ## Product scope
 
-Workspace Suite is composed of independently operable modules:
+Essentials+ Office has a deliberately narrow product boundary:
 
 - Nextcloud Files, sharing, versions and sync
 - Calendar, Contacts and Tasks as the canonical groupware data store
-- Nextcloud Talk; TURN and the high-performance backend are separate production stages
-- Nextcloud Office with a dedicated Collabora Online container for browser-based documents, spreadsheets and presentations
-- Nextcloud Mail connected to mailcow over IMAP/SMTP
-- Notes for personal notes, Collectives for shared knowledge, Deck for Kanban, plus Tables and Forms
-- mailcow as an independently managed mail subsystem; SOGo is an optional fallback webmail, not a second canonical calendar/contact system
-- centralized OIDC/SSO only after the core modules are stable
+- Nextcloud Talk, with TURN as a separate optional service
+- Nextcloud Office with Collabora as a separate optional service
+- Nextcloud Mail only as an IMAP/SMTP integration boundary
+- Vaultwarden as a separate optional service
+- bounded HR Lite and Intranet Lite modules using existing Nextcloud functions
+- Essentials+ Calls only as a disabled external integration
 
-The current NUC deployment contains only the validated Nextcloud core. This
-repository now defines declarative apps, an optional dedicated Collabora
-overlay, an optional coturn overlay, encrypted offsite backup automation, and
-an isolated restore test. These additions are disabled until their documented
-gates pass; their presence in Git does not mean they are deployed. The Talk
-high-performance backend remains a later stage. mailcow remains a separately
-pinned upstream project and must not be pasted into the Nextcloud Compose file:
-it has its own lifecycle, ports, DNS, backups and substantial memory
-requirements. A production mail system should use infrastructure with a static
-address and controllable PTR/rDNS rather than relying on a residential dynamic
-connection.
+Optional modules are disabled until their own gates pass. Their presence in Git
+does not mean they are deployed. This work does not install mailcow, HPB, OIDC,
+new password-manager functions, public registration, or additional modules.
 
 The repository deliberately contains no secrets and no user data. It deploys
 Nextcloud 34 (Apache), PostgreSQL 17, Redis 7, and a dedicated Nextcloud cron
-container. Caddy remains a shared, independent reverse-proxy stack on the NUC.
+container. The design keeps Caddy as a shared, independent reverse-proxy stack;
+its current NUC state is unknown.
 
-## Current deployment status
+## Operational evidence status
 
-Status verified on 2026-08-12:
+| Observation | Date | Observed host/environment | Git commit | Method | Proof boundary |
+| --- | --- | --- | --- | --- | --- |
+| Repository baseline before this branch | 2026-08-19 | local Codex workspace | `17081f20704e77dea6d1c983bdf8f2bde779e8f2` | Git/GitHub inspection | Says nothing about the deployed host. |
+| NUC core, local backup, and Caddy disk/runtime state | 2026-08-13 | historical host recorded only as `NUC` | `3888bae` | read-only SSH inventory plus local backup/restore | Historical only; hostname was not retained and the current deployed commit is unknown. |
+| Full disposable Office and local encrypted Restic restore | 2026-08-13 | GitHub-hosted runner | `520c239` | Actions run `31730633740` | Synthetic and same-runner only; not offsite or live evidence. |
+| Latest `main` CI | 2026-08-13 | GitHub-hosted runner | `17081f20704e77dea6d1c983bdf8f2bde779e8f2` | Actions run `31735217485` | Failed in Admin Center Browser-E2E; other jobs passed. |
+| Public DNS/ingress | 2026-08-18T23:53:19Z | external Codex runner | working tree based on `17081f2` | `check-external-ingress.sh`, expected strategy `either` | No A or AAAA records; TCP, TLS, HTTP, DAV, and upload-path checks were therefore not applicable. |
+| Current NUC revision, drift, offsite restore, and production state | 2026-08-19 | no authorized target alias identified | `unknown` | safe access discovery | Open, not inferred from historical documentation. |
 
-- The repository is checked out on the NUC at `/opt/nextcloud`; persistent data
-  is stored below `/srv/nextcloud`.
-- Nextcloud 34.0.2 is installed and outside maintenance mode. The application,
-  PostgreSQL, Redis, and cron containers are running; the database and
-  application health checks pass.
-- Cron execution, local backup creation, and application-container restart
-  persistence have been tested. PostgreSQL and Redis publish no host ports.
-- The Namecheap DDNS script and systemd units are installed on the NUC, but the
-  timer remains disabled until the per-domain DDNS password is entered locally
-  and the `cloud` A + Dynamic DNS record exists at Namecheap.
-- `https://cloud.itmitalles.de` is **not publicly live**. Public DNS has no
-  `cloud` A/AAAA record, router reachability is not yet verified from a truly
-  external network, and the shared Caddy configuration must be reconciled
-  before its existing configuration is reloaded.
-- Local backups exist on the same NVMe. A tested restore plus encrypted offsite
-  backup remain mandatory before production data is migrated.
-- A 2026-08-13 follow-up authenticated to the NUC, confirmed that public DNS
-  still has no `cloud` A/AAAA record, proved Caddy disk/runtime equivalence,
-  measured the core, and restored a fresh live backup on isolated disposable
-  infrastructure. See [NUC baseline and validation gate](docs/operations/NUC_BASELINE.md).
+See the [verification matrix](docs/VERIFICATION_MATRIX.md) for the eleven
+non-inheriting evidence classes and [NUC baseline](docs/operations/NUC_BASELINE.md)
+for the dated historical observation.
 
 ## Reproducible operations
 
@@ -72,7 +61,7 @@ The base stack remains `compose.yaml`. Optional capabilities are independent:
 | Declared Nextcloud apps | `scripts/reconcile-apps.sh` | no implicit mutation |
 | Dedicated Collabora | `compose.collabora.yaml`, profile `office` | off |
 | coturn | `compose.talk-turn.yaml`, profile `talk-turn` | off |
-| mailcow | separate upstream checkout pinned by `mailcow/UPSTREAM_COMMIT` | not installed |
+| Mail integration | Nextcloud Mail plus synthetic TLS protocol fixture | off; no mail platform is installed |
 
 Operational runbooks:
 
@@ -81,7 +70,7 @@ Operational runbooks:
 - [Nextcloud apps](docs/operations/NEXTCLOUD_APPS.md)
 - [Collabora](docs/operations/COLLABORA.md)
 - [Talk and TURN](docs/operations/TALK.md)
-- [mailcow boundary](mailcow/README.md)
+- [mail integration boundary](mailcow/README.md)
 - [Fictitious end-to-end demo](docs/operations/DEMO_FLOW.md)
 
 ## Architecture
@@ -89,7 +78,7 @@ Operational runbooks:
 ```text
 Internet over IPv4 and/or IPv6
         |
-  cloud.itmitalles.de (DNS-only A/AAAA)
+  cloud.itmitalles.de (expected DNS-only A/AAAA; currently absent)
         |
   Caddy :443 on proxy_net
         |
@@ -146,7 +135,7 @@ directory.
 
 ```bash
 sudo install -d -m 0755 -o "$USER" -g "$USER" /opt/nextcloud
-git clone https://github.com/itmitalles-de/cloud.itmitalles.de.git /opt/nextcloud
+git clone https://github.com/itmitalles-de/essentials-office.git /opt/nextcloud
 cd /opt/nextcloud
 sudo ./scripts/provision-host.sh
 sudo ./scripts/deploy.sh --apps
@@ -169,36 +158,38 @@ copy in secret management before relying on the instance.
 
 ## DNS and public reachability
 
-Do not assume a public IPv4 address: DS-Lite and CGNAT are common. Prefer a
-DNS-only `AAAA` record for `cloud` pointing to the NUC/reverse proxy's public,
-routable IPv6 address. Do not point the record at a Tailscale address.
+The public address-family strategy is an operator decision. A public record may
+refer only to a verified, routable ingress address; a Tailscale address is not a
+public DNS target. Do not infer forwardable IPv4 from an outbound address, and
+do not infer IPv6 ingress from a locally assigned address.
 
-At the DNS provider, create only this record for the cloud host:
+The current external observation is dated 2026-08-18T23:53:19Z and was made by
+an external Codex runner against a working tree based on `17081f2`, using
+`scripts/check-external-ingress.sh` with the minimal `either` strategy. It found
+neither `A` nor `AAAA` for `cloud.itmitalles.de`; therefore TCP, TLS, HTTP, DAV,
+and upload-path checks were not applicable. This proves only that the service
+was not publicly live at that observation; it says nothing about the NUC or
+router.
 
-```text
-Type: AAAA
-Host: cloud
-Value: <NUC or reverse-proxy public IPv6>
-Mode: DNS only
-```
-
-The router must allow inbound IPv6 TCP 80 and 443 to the NUC. The host firewall
-must allow those ports as well. Verify from an external IPv6-capable network
-before relying on ACME. Caddy then obtains and renews the certificate itself.
+After an operator declares the intended `ipv4-only`, `ipv6-only`, `dual-stack`,
+or `either` strategy, run the external checker from a genuinely external
+network. Store its JSON, Markdown, and SHA-256 outputs outside Git after a
+privacy review.
 
 ### Namecheap Dynamic DNS on the NUC
 
-The domain currently uses Namecheap authoritative DNS. Namecheap's native
+The repository includes an optional Namecheap IPv4 DDNS path. Namecheap's native
 Dynamic DNS endpoint updates only an IPv4 `A` record; it cannot update `AAAA`
 records. This is useful only when the router itself has a publicly routable
 IPv4 address and forwards TCP 80 and 443 to the NUC. An address returned by a
 public “what is my IP” service does not prove that condition: a CGNAT gateway
 returns an address as well but does not accept inbound forwarding.
 
-In Namecheap, open **Domain List → Manage → Advanced DNS**, enable **Dynamic
-DNS**, and create an **A + Dynamic DNS Record** with host `cloud`. Do not paste
-the Dynamic DNS password into Git, chat, shell history, or an issue. On the NUC,
-run the interactive installer from the repository checkout:
+If the responsible DNS operator has verified Namecheap as the current
+authoritative provider and selected public IPv4, they may create an **A +
+Dynamic DNS Record** with host `cloud`. Do not paste the Dynamic DNS password
+into Git, chat, shell history, or an issue. On the authorized host, the
+interactive installer is:
 
 ```bash
 cd /opt/nextcloud
@@ -219,7 +210,7 @@ systemctl list-timers --all namecheap-ddns.timer
 journalctl -u namecheap-ddns.service --since today --no-pager
 ```
 
-If the Netgear WAN IPv4 is not the same address family/path shown by the NUC,
+If the router WAN IPv4 is not the same address family/path shown by the NUC,
 or the router offers no IPv4 port forwarding, do not enable this `A` record as
 the public Nextcloud path. Namecheap cannot keep a changing IPv6 prefix updated
 with its native DDNS feature. The clean alternative is to move authoritative
@@ -238,26 +229,21 @@ record.
 
 ## Caddy integration
 
-Copy the site block from [Caddyfile.example](Caddyfile.example) into the shared
-Caddy configuration. Keep existing site blocks unchanged. Validate the complete
-Caddyfile before reloading Caddy:
-
-```bash
-cd /opt/caddy
-cp Caddyfile "Caddyfile.before-nextcloud.$(date -u +%Y%m%dT%H%M%SZ)"
-printf '\n' >> Caddyfile
-cat /opt/nextcloud/Caddyfile.example >> Caddyfile
-docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
-```
+The site fragment in [Caddyfile.example](Caddyfile.example) is an expected route,
+not authority to append to or reload the shared configuration. First collect
+the on-disk and runtime hashes read-only, validate the complete Caddyfile, and
+inventory every existing site. Follow the protected backup, semantic diff,
+validate, reload, and rollback sequence in the
+[Caddy drift runbook](docs/operations/CADDY_DRIFT.md).
 
 The supplied block implements the required CardDAV and CalDAV redirects and
 proxies to `nextcloud-app:80` over `proxy_net`. Caddy obtains TLS certificates
 only after the DNS record is publicly visible and TCP 80/443 reach it.
 
-If Caddy's on-disk configuration and its running configuration disagree, stop
-there and reconcile that drift before a reload. A reload with a stale file can
-silently remove a working existing route.
+As of 2026-08-19 no current authorized host observation exists. The historical
+2026-08-13 observation at deployed commit `3888bae` found matching disk/runtime
+configuration but no intended Nextcloud site; that result cannot be carried
+forward to today's deployment.
 
 ## Backups
 
@@ -271,8 +257,9 @@ sudo ./scripts/backup.sh
 The script takes an exclusive lock, enables maintenance mode, creates a
 consistent PostgreSQL custom-format dump, archives the persistent Nextcloud
 filesystem (`html` and `data`), stores a resolved but secret-redacted
-Compose configuration, and reliably disables maintenance mode even when a
-command fails. It intentionally does **not** copy the live PostgreSQL data
+Compose configuration for the recorded source commit plus declared and
+actually running image evidence, and reliably disables maintenance mode even
+when a command fails. It intentionally does **not** copy the live PostgreSQL data
 directory: the logical `pg_dump` is the consistent database backup. Redis is
 also not restored from a stale AOF; it is cache/locking/session state and is
 recreated empty during disaster recovery. PostgreSQL object owners and ACLs are
@@ -281,12 +268,16 @@ retained because Nextcloud 34 can use a dedicated application database role.
 The default target is `<NEXTCLOUD_DATA_ROOT>/backups` (production:
 `/srv/nextcloud/backups`). This is convenient for local
 recovery only; it does not protect against NVMe failure, theft, fire, or a
-destructive host incident. External, encrypted, tested offsite backups are a
-required follow-up before treating the service as production-safe.
+destructive host incident. An external encrypted snapshot and an independent
+empty-target restore are required before treating the service as
+production-safe.
 `scripts/offsite-backup.sh` implements that follow-up with restic, root-only
 repository/password files, and a post-upload repository check. The live `.env`
-is included only inside restic's encrypted snapshot. See the backup runbook for
-setup and the isolated restore test.
+is included only inside restic's encrypted snapshot. See the
+[backup runbook](docs/operations/BACKUP_RESTORE.md) and
+[offsite acceptance contract](docs/operations/OFFSITE_ACCEPTANCE.md). As of
+2026-08-19 no approved provider credentials, real snapshot receipt, or
+independent restore-host receipt exists; this gate is externally blocked.
 
 ### Restore and disaster recovery order
 
@@ -315,27 +306,30 @@ is needed.
 
 ## Updates
 
-```bash
-cd /opt/nextcloud
-git pull --ff-only origin main
-sudo ./scripts/update.sh
-```
+Updates start from a reviewed Git commit whose Nextcloud, PostgreSQL, Redis, and
+optional-service images are exact tag-and-digest pins. `scripts/update.sh`
+refuses an unexpected major, takes a backup before pulling, records the exact
+previous image IDs, and enters maintenance mode only after a successful pull.
+It requires Compose startup, OCC, database-upgrade, and health gates to pass.
 
-`update.sh` first runs a backup, verifies that the image declarations are
-exactly `nextcloud:34-apache`, `postgres:17-alpine`, and `redis:7-alpine`, pulls
-the current minor/patch release within those major tags, starts the controlled
-Compose update, and runs `occ status` plus the health checks.
-
-It refuses unexpected images and never performs a major upgrade. Upgrade
-Nextcloud majors one at a time, following the official release path, with a
-tested restore point and maintenance window.
+A failed start or health gate restores the exact previous image IDs through a
+temporary override, exits maintenance mode, and runs core health checks. A
+failed pull leaves the running stack and maintenance state untouched. This is
+an image rollback, not a database downgrade; the pre-update backup remains the
+recovery boundary for schema-changing releases. No live update is permitted
+until the current deployed revision and drift are known and an independent
+restore has passed. The script enforces a matching full approved commit, clean
+checkout, and root-owned all-pass drift report before its production path can
+run.
 
 ## Validation checklist
 
-GitHub Actions runs only repository-safe checks: base and overlay Compose
-rendering, recursive Bash syntax, ShellCheck, and a full-history Gitleaks scan.
-It deliberately does not simulate the NUC, Caddy, public DNS/TLS, WebDAV,
-Collabora, TURN, or restore. Run the same static checks locally with:
+GitHub Actions runs static and supply-chain checks, full-history Gitleaks,
+repository SBOM generation, isolated optional-service contracts, and a
+disposable Nextcloud stack with synthetic WebDAV, browser, module, backup,
+encrypted local Restic, and empty-target restore flows. These remain classes
+1–7; they do not prove the NUC, independent offsite recovery, public ingress,
+or production. Run the repository-safe static subset locally with:
 
 ```bash
 ./scripts/validate-static.sh
@@ -373,8 +367,8 @@ Before production use, also verify:
 - Nextcloud trusts only the live `proxy_net` CIDR, not all RFC1918 networks.
 - HTTPS terminates at Caddy; Nextcloud is explicitly configured for the public
   HTTPS URL and reverse-proxy headers.
-- Container images are pinned to deliberate major versions. Patch/minor tags
-  remain floating by design and are updated by the controlled script.
+- Runtime and test container images are exact tag-and-digest pins. A reviewed
+  patch/minor update changes both values; mutable major tags are rejected.
 
 ## Troubleshooting
 
@@ -394,23 +388,21 @@ Before production use, also verify:
   automatic substitute for large-file Nextcloud traffic; assess transfer,
   upload, and operational constraints before adopting it.
 
-## Open operational items
+## Open operational gates
 
-- Authenticate to the actual NUC and create a fresh read-only inventory; do not
-  reload Caddy until its disk/runtime result is `match`.
-- Enable Namecheap Dynamic DNS and create the `cloud` A + Dynamic DNS record,
-  then enter its per-domain password locally on the NUC.
-- Verify from a genuinely external network whether the Netgear router has a
-  forwardable public IPv4 and whether TCP 80/443 reach Caddy. If it does not,
-  choose a DNS provider with dynamic `AAAA` support and verify the IPv6 path.
-- Reconcile any existing Caddy configuration drift before reloading it.
-- Before any real personal, customer, or mail data is stored: configure the
-  Google Drive/restic target, upload the generated `.env` only through the
-  encrypted snapshot, and pass the disposable offsite restore test. This is
-  deliberately deferred during the fictitious-data IaC phase.
-- Reconcile the declared Nextcloud apps, then enable and accept Collabora before
-  beginning TURN work. HPB remains gated on successful external TURN tests.
-- Select and validate a separate mailcow VM/VPS before following the pinned
-  upstream lifecycle.
-- Define users, groups, sharing policy, retention, and the Dropbox migration
-  plan before importing production data.
+1. Provide an approved noninteractive SSH target alias for the actual NUC and
+   run the read-only deployment collector. This is the next single useful
+   operational action; no update, pull, restart, or Caddy reload belongs before
+   it.
+2. Reconcile the observed commit, Compose, images, modules, mounts, and Caddy
+   hashes against the reviewed repository state.
+3. Assign the operator and approve or replace the proposed RPO/RTO in the
+   [service objectives](docs/operations/SERVICE_LEVEL_OBJECTIVES.md).
+4. Configure an approved independent Restic target, create a real encrypted
+   snapshot, and restore it on independent empty infrastructure under the
+   [acceptance runbook](docs/operations/OFFSITE_ACCEPTANCE.md).
+5. Declare the intended public address-family strategy, then repeat the ingress
+   checker externally. Do not create DNS or change Caddy automatically.
+
+No optional module activation, user migration, or production data belongs ahead
+of these gates.

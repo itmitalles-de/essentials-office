@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the base packages required to deploy Workspace Suite on Ubuntu.
+# Install the base packages required to deploy Essentials+ Office on Ubuntu.
 set -Eeuo pipefail
 
 MODE=apply

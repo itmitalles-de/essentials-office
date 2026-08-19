@@ -1,4 +1,4 @@
-# Workspace Suite demo flow
+# Essentials+ Office demo flow
 
 ## Data policy
 
@@ -19,7 +19,8 @@ classified as demo, and remove them with their data after acceptance.
 - All declared apps are enabled and inventoried.
 - Collabora discovery, WOPI restrictions, and two-user editing pass.
 - Talk chat/P2P passes; TURN is required only after its external acceptance.
-- A private demo mailcow delivers locally while outbound TCP 25 is blocked.
+- The synthetic TLS IMAP/SMTP fixture is available; no mail platform is
+  installed by this repository.
 
 ## Acceptance journey
 
