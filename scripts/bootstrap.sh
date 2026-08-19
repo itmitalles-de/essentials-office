@@ -107,9 +107,12 @@ if [ "$configured_proxies" != "$proxy_cidr" ]; then
   fi
 fi
 
-readarray -t nc_identity < <(image_identity nextcloud:34-apache www-data)
-readarray -t pg_identity < <(image_identity postgres:17-alpine postgres)
-readarray -t redis_identity < <(image_identity redis:7-alpine redis)
+readarray -t nc_identity < <(image_identity \
+  nextcloud:34.0.2-apache@sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329 www-data)
+readarray -t pg_identity < <(image_identity \
+  postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 postgres)
+readarray -t redis_identity < <(image_identity \
+  redis:7.4.10-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2 redis)
 [ "${#nc_identity[@]}" -eq 2 ] || die 'could not determine Nextcloud image ownership'
 [ "${#pg_identity[@]}" -eq 2 ] || die 'could not determine PostgreSQL image ownership'
 [ "${#redis_identity[@]}" -eq 2 ] || die 'could not determine Redis image ownership'

@@ -2,15 +2,14 @@
 
 ## Purpose and boundaries
 
-This repository deploys **Essentials+ Office**, the Essentials Plus collaboration product,
-currently a reproducible Nextcloud core
-for `cloud.itmitalles.de`. The repository is persistent project memory; a chat
-or agent session is temporary working memory.
+This repository deploys **Essentials+ Office**, currently a reproducible
+Nextcloud core for `cloud.itmitalles.de`. The repository is persistent project
+memory; a chat or agent session is temporary working memory.
 
-Files, Calendar, Contacts, Tasks, Talk, Office, and related Nextcloud apps are
-in scope. Freelancer billing and ERP/shop functions are not. mailcow is a
-separate upstream-operated subsystem even when it is integrated with Nextcloud
-Mail; never fold its lifecycle into this Compose project.
+Files, Calendar, Contacts, Tasks, and the existing default-inactive modules are
+in scope. Mail is only an external IMAP/SMTP integration boundary. mailcow,
+HPB, OIDC/SSO, migrations, public registration, and new modules are out of
+scope while the operating and recovery gates remain open.
 
 ## Startup
 
@@ -47,10 +46,11 @@ operational documents and scripts only for the component being changed.
 ## Working conventions
 
 - Inspect before editing and preserve the existing deployment topology.
-- Add modules as optional profiles, overlays, or clearly separate stacks.
-- Keep mailcow on its own pinned upstream lifecycle and backup path.
-- Keep Nextcloud canonical for calendars, contacts, and tasks; SOGo is only an
-  optional mail/fallback client.
+- Do not add product modules until deployed revision, drift, independent
+  offsite recovery, RPO/RTO ownership, ingress, and update/rollback are accepted.
+- Keep Mail provider-neutral and limited to an IMAP/SMTP integration boundary;
+  do not install or operate a mail platform from this repository.
+- Keep Nextcloud canonical for calendars, contacts, and tasks.
 - Use targeted `rg` searches and narrow file reads.
 - Avoid recursive documentation ingestion, giant log dumps, and rereading large
   files when a focused excerpt is sufficient.

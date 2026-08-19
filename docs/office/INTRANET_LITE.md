@@ -1,6 +1,6 @@
 # Optional Intranet Lite
 
-Intranet Lite is Office's lightweight, Nextcloud-native intranet module:
+Intranet Lite is the lightweight, Nextcloud-native Essentials+ Office intranet module:
 
 - **Collectives** for durable internal knowledge;
 - **Teams** (`circles` app) for membership and collaboration scope;
@@ -10,7 +10,7 @@ Intranet Lite is Office's lightweight, Nextcloud-native intranet module:
 Nextcloud declares Teams (`circles`), Collectives, Forms, and Announcement
 Center as protected platform app types and therefore refuses per-group app
 enablement for them. The module manifest marks those prerequisites
-`platform-global`; Office still restricts the Intranet catalog entry and the
+`platform-global`; Essentials+ Office still restricts the Intranet catalog entry and the
 actual Collectives/files through module groups and content ACLs. Logical
 deactivation disables a shared platform app only when no other active module
 needs it and deletes neither app data nor content. Dashboard, Tables, and Deck

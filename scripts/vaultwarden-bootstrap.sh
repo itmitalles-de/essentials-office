@@ -93,7 +93,8 @@ if [ "$ENABLE_ADMIN" = true ]; then
   [ "$admin_token" = "$admin_token_repeat" ] || die 'admin token confirmation does not match'
 
   admin_hash=$(printf '%s' "$admin_token" | docker run --rm -i \
-    --entrypoint /vaultwarden vaultwarden/server:1.37.1 hash)
+    --entrypoint /vaultwarden \
+    vaultwarden/server:1.37.1@sha256:ebdfe70701c60ac0c28c697e787cea767d7972940b786037b29fe0d507f821e8 hash)
   unset admin_token admin_token_repeat
   [[ "$admin_hash" == \$argon2* ]] || die 'Vaultwarden did not return an Argon2 admin-token hash'
   sed -i "s|^# ADMIN_TOKEN=.*|ADMIN_TOKEN='$admin_hash'|" "$ENV_FILE"

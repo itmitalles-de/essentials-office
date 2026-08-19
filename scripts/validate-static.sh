@@ -73,7 +73,8 @@ import xml.etree.ElementTree as ET
 for source in pathlib.Path("nextcloud-apps").rglob("*.xml"):
     ET.parse(source)
 PY
-docker run --rm --network none -v "$PROJECT_DIR/nextcloud-apps/essentialsplus:/app:ro" nextcloud:34-apache \
+docker run --rm --network none -v "$PROJECT_DIR/nextcloud-apps/essentialsplus:/app:ro" \
+  nextcloud:34.0.2-apache@sha256:3323e178371b1b0d03f9b3fdbe1831ff78335f07f25116d0d598048ce459e329 \
   sh -ec 'find /app -type f -name "*.php" -print0 | xargs -0 -n1 php -l >/dev/null'
 
 for caddy_file in Caddyfile.example Caddyfile.vaultwarden.example caddy/office.Caddyfile.example tests/vaultwarden/Caddyfile; do
@@ -91,4 +92,8 @@ fi
 
 "$PROJECT_DIR/tests/office-modules-contract.sh"
 "$PROJECT_DIR/tests/update-policy.sh"
-printf 'validate-static: Compose, schema, Caddy, PHP, Python, JS, ShellCheck, and security checks passed\n'
+"$PROJECT_DIR/tests/deployment-state-comparison.sh"
+"$PROJECT_DIR/tests/update-rollback.sh"
+"$PROJECT_DIR/scripts/check-supply-chain.sh"
+"$PROJECT_DIR/scripts/check-secrets.sh" --tracked
+printf 'validate-static: Compose, schema, Caddy, PHP, Python, JS, ShellCheck, supply-chain, drift, update, and working-tree secret checks passed\n'

@@ -1,6 +1,6 @@
-# Office Admin Center
+# Essentials+ Office Admin Center
 
-**Office** is the Essentials Plus collaboration product. This page is the complete
+**Essentials+ Office** is the collaboration product. This page is the complete
 administrator catalog; it is not an entitlement list for ordinary users.
 
 ## Collaboration
@@ -10,7 +10,7 @@ administrator catalog; it is not an entitlement list for ordinary users.
 | Files and groupware | active | all authenticated users | existing Nextcloud health check |
 | Office documents | inactive | `office-user` | configured Collabora plus HTTPS health check |
 | Chat and meetings | inactive | `office-user` | configured Talk path plus HTTPS health check |
-| Mail | inactive | `office-user` | separately operated mailcow/host plus HTTPS health check |
+| Mail | inactive | `office-user` | approved external IMAP/SMTP provider plus health check |
 
 ## Knowledge and intranet
 
@@ -33,7 +33,7 @@ parallel default wiki.
 | Module | Default | Audience when active | Activation gate |
 | --- | --- | --- | --- |
 | Password vault | inactive | `office-user` | isolated Vaultwarden health check and private HTTPS route |
-| Visual PBX | inactive | `office-user` | separate product has all release gates and a successful health check |
+| Essentials+ Calls | inactive | `office-user` | external integration has all release gates and a successful health check |
 
 Disabling a module only removes its entitlement/link after the relevant manual
 administration action. It never removes a database, volume, backup, or user

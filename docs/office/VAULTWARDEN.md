@@ -1,6 +1,6 @@
 # Optional Vaultwarden password vault
 
-Vaultwarden is Office's optional, web-only password-vault MVP. It is the
+Vaultwarden is the optional, web-only Essentials+ Office password-vault MVP. It is the
 Bitwarden-compatible Web Vault for organisations, collections, roles, and
 groups. Browser extensions and native Bitwarden clients remain optional client
 choices; this repository does not distribute or manage them.
@@ -14,8 +14,8 @@ not used as a group vault. Passbolt is deliberately outside this web-only MVP.
 
 - **Implemented in this repository:** the `vaultwarden` Compose profile,
   private Caddy example, bootstrap, health check, SQLite backup/empty-target
-  restore, controlled update helper, and the Office activation gate.
-- **Not enabled by default:** profile, private DNS/Caddy route, and Office link
+  restore, controlled update helper, and the Essentials+ Office activation gate.
+- **Not enabled by default:** profile, private DNS/Caddy route, and Essentials+ Office link
   all remain off until an administrator configures and checks them.
 - **Not verified on a NUC or public DNS:** this change does not touch either.
 - **Version:** `vaultwarden/server:1.37.1`, checked against the upstream latest
@@ -29,7 +29,7 @@ The repository does not claim Bitwarden affiliation or support.
 
 Organization groups require Vaultwarden's `ORG_GROUPS_ENABLED=true` setting.
 Upstream marks this feature as **beta with known issues** in version 1.37.1.
-The example enables it because groups are part of the Office module contract;
+The example enables it because groups are part of the Essentials+ Office module contract;
 operators must review that warning and the upstream changelog before each
 upgrade rather than treating group semantics as unconditionally stable.
 

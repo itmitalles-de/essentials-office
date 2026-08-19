@@ -5,7 +5,10 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 PROJECT_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE=${OFFSITE_BACKUP_CONFIG:-/etc/nextcloud/offsite-backup.env}
+EVIDENCE_FILE=${OFFSITE_EVIDENCE_FILE:-/var/lib/essentials-office/evidence/last-offsite-snapshot.json}
 BACKUP_ROOT=
+BACKUP_JSON=
+EVIDENCE_TMP=
 
 die() {
   printf 'offsite-backup: %s\n' "$*" >&2
@@ -29,11 +32,23 @@ env_value() {
   awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$PROJECT_DIR/.env"
 }
 
+cleanup() {
+  local status=$?
+  if [ -n "$BACKUP_JSON" ] && [[ "$BACKUP_JSON" == /tmp/essentials-office-restic-backup.* ]]; then
+    rm -f -- "$BACKUP_JSON"
+  fi
+  if [ -n "$EVIDENCE_TMP" ] && [ -f "$EVIDENCE_TMP" ]; then
+    rm -f -- "$EVIDENCE_TMP"
+  fi
+  exit "$status"
+}
+trap cleanup EXIT INT TERM
+
 if [ "${EUID}" -ne 0 ]; then
   exec sudo -- "$0" "$@"
 fi
 
-for command in awk find flock head restic sort stat tail tr; do
+for command in awk cat chmod cmp date dirname find flock head hostname install jq mktemp mv restic rm sort stat tail tr; do
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
 done
 
@@ -58,6 +73,9 @@ require_protected_file "$RESTIC_PASSWORD_FILE"
 data_root=$(env_value NEXTCLOUD_DATA_ROOT)
 [ -n "$data_root" ] || die 'NEXTCLOUD_DATA_ROOT is empty in .env'
 BACKUP_ROOT=${BACKUP_DIR:-$data_root/backups}
+case "$BACKUP_ROOT" in /*) ;; *) die 'backup root must be absolute' ;; esac
+[ "$BACKUP_ROOT" != / ] || die 'backup root must not be the filesystem root'
+install -d -o root -g root -m 0700 "$BACKUP_ROOT"
 
 repository=$(tr -d '\r\n' <"$RESTIC_REPOSITORY_FILE")
 case "$repository" in
@@ -84,8 +102,45 @@ latest_backup=$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d \
   ! -name '.*' -printf '%f\n' | sort | tail -n 1)
 [ -n "$latest_backup" ] || die 'local backup completed but no backup directory was found'
 
-restic backup --quiet --tag nextcloud --tag "$latest_backup" \
-  "$BACKUP_ROOT/$latest_backup" "$PROJECT_DIR/.env"
-restic check --read-data-subset="${RESTIC_READ_DATA_SUBSET:-5%}"
+BACKUP_JSON=$(mktemp /tmp/essentials-office-restic-backup.XXXXXX)
+chmod 0600 "$BACKUP_JSON"
+restic backup --json --tag nextcloud --tag "$latest_backup" \
+  "$BACKUP_ROOT/$latest_backup" "$PROJECT_DIR/.env" >"$BACKUP_JSON"
+snapshot_id=$(jq -r 'select(.message_type == "summary") | .snapshot_id // empty' "$BACKUP_JSON" | tail -n 1)
+[[ "$snapshot_id" =~ ^[0-9a-f]{64}$ ]] || die 'restic did not return a full snapshot ID'
+snapshot_time=$(restic snapshots --json "$snapshot_id" \
+  | jq -r --arg id "$snapshot_id" '.[] | select(.id == $id) | .time // empty')
+[ -n "$snapshot_time" ] || die 'restic did not return the snapshot time'
+check_scope=${RESTIC_READ_DATA_SUBSET:-5%}
+restic check --read-data-subset="$check_scope"
 
-printf 'offsite-backup: encrypted snapshot created and repository check passed for %s\n' "$latest_backup"
+repository_commit=$(cat "$BACKUP_ROOT/$latest_backup/repository-commit.txt" 2>/dev/null || printf unknown)
+repository_dirty=$(jq -r '.repository.dirty' "$BACKUP_ROOT/$latest_backup/versions.json")
+case "$repository_dirty" in true|false) ;; *) die 'local backup has no reliable repository dirty state' ;; esac
+evidence_dir=$(dirname -- "$EVIDENCE_FILE")
+install -d -o root -g root -m 0700 "$evidence_dir"
+EVIDENCE_TMP=$(mktemp "$evidence_dir/.last-offsite-snapshot.XXXXXX")
+chmod 0600 "$EVIDENCE_TMP"
+jq -n \
+  --arg snapshotId "$snapshot_id" --arg snapshotTimeUtc "$snapshot_time" \
+  --arg sourceHost "$(hostname)" --arg repositoryCommit "$repository_commit" \
+  --argjson repositoryDirty "$repository_dirty" \
+  --arg backupTimestamp "$latest_backup" --arg checkScope "$check_scope" \
+  '{schemaVersion: "1.0.0", snapshotId: $snapshotId, snapshotTimeUtc: $snapshotTimeUtc,
+    sourceHost: $sourceHost, repositoryCommit: $repositoryCommit, repositoryDirty: $repositoryDirty,
+    backupTimestamp: $backupTimestamp, checkScope: $checkScope,
+    repositoryCheckPassed: true}' >"$EVIDENCE_TMP"
+snapshot_receipt="$evidence_dir/offsite-snapshot-$snapshot_id.json"
+if [ -e "$snapshot_receipt" ]; then
+  cmp -s "$EVIDENCE_TMP" "$snapshot_receipt" ||
+    die "immutable snapshot receipt conflicts with existing evidence: $snapshot_receipt"
+else
+  install -o root -g root -m 0600 "$EVIDENCE_TMP" "$snapshot_receipt"
+fi
+mv -- "$EVIDENCE_TMP" "$EVIDENCE_FILE"
+EVIDENCE_TMP=
+chmod 0600 "$EVIDENCE_FILE"
+
+printf 'offsite-backup: encrypted snapshot %s at %s and repository check passed for %s\n' \
+  "$snapshot_id" "$snapshot_time" "$latest_backup"
+printf 'offsite-backup: secret-redacted latest and immutable receipts written to %s\n' "$evidence_dir"

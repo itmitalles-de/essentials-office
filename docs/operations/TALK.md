@@ -74,13 +74,8 @@ Then force relay candidates in a browser call and test Firefox and Chromium,
 mobile data, restrictive Wi-Fi, UDP, and TCP independently. A local healthcheck
 or NAT hairpin test does not satisfy this gate.
 
-## Stage 3: high-performance backend
+## Excluded high-performance backend
 
-HPB is intentionally not instantiated yet. It starts only after Stage 2 passes
-from an external restrictive network and measured call load justifies it. Its
-future deployment must use separate signaling, TURN, and internal secrets,
-dedicated WebSocket proxy routes, explicit media ports, its own backup/update
-procedure, and an independently removable Compose project or overlay.
-
-TURN can still be required with HPB. For maximum compatibility, TURN/TLS and
-HPB may each need port 443 and therefore separate public IPs or hosts.
+HPB is not implemented and is outside the Essentials+ Office operating-gates
+scope. Local Talk/TURN success must not be presented as HPB, real browser-media,
+or NAT evidence.

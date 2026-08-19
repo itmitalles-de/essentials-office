@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Make a module inactive in the local Office contract without deleting any data.
+# Make a module inactive in the local Essentials+ Office contract without deleting data.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

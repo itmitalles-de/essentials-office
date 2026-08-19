@@ -25,7 +25,7 @@ or an optional Argon2 admin-token hash into Git. See
 
 The synthetic HR Lite reconciler creates a mode-`0600`
 `/opt/nextcloud/.hr-lite-demo.env` only on an approved disposable instance.
-It must not be used for real people or copied to Git. The Office module and
+It must not be used for real people or copied to Git. The Essentials+ Office module and
 Visual PBX local activation files are configuration-only and use their ignored
 paths documented in `config/office-modules.env.example` and
 `integrations/visual-pbx.env.example`.

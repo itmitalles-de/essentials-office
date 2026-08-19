@@ -37,7 +37,7 @@ done
 enabled=$(config_value VISUAL_PBX_ENABLED)
 case "$enabled" in true|false) ;; *) die 'VISUAL_PBX_ENABLED must be true or false' ;; esac
 
-# Office never defines a PBX container, port, or Caddy route.
+# Essentials+ Office never defines a PBX container, port, or Caddy route.
 docker compose --env-file "$NEXTCLOUD_ENV_FILE" -f "$PROJECT_DIR/compose.yaml" config --services | grep -Eiq '^visual-pbx$|^pbx$' &&
   die 'a PBX service must not be added to the Nextcloud core compose file'
 if rg -n '^\s*reverse_proxy\s+.*(visual-pbx|\bpbx\b)' \

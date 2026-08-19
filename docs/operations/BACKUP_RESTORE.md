@@ -4,17 +4,29 @@
 
 `scripts/backup.sh` remains the consistency boundary. It enables maintenance
 mode, stops cron, creates a PostgreSQL custom-format dump, archives `html` and
-`data`, records the repository commit, and creates checksums. It does not copy
+`data`, records the repository commit/dirty state and both declared and running
+image evidence, writes
+`compose.resolved.redacted.json` with every environment value removed, and
+creates checksums. It does not copy
 the live PostgreSQL directory. Redis holds cache, locks, and session state; a
 disaster restore recreates it empty instead of reviving a stale live AOF.
 PostgreSQL ownership and ACL metadata remains in the dump: Nextcloud 34 may
 create a separate application login rather than using `POSTGRES_USER` directly.
+During a controlled update, the checkout already contains the reviewed target
+commit while the containers still run the accepted source state. In that case
+the backup script extracts the source commit's Compose, environment example,
+and Caddy example directly from Git without checking it out, and embeds those
+source artifacts alongside the actual running image IDs. It never rewrites the
+working tree.
 
 `scripts/offsite-backup.sh` then sends the completed backup directory and the
 NUC-local `.env` to a restic repository. Restic encrypts content and metadata.
 The repository location and password are read from separate root-only files;
 neither appears in the repository or the command line. The script finishes
-with `restic check --read-data-subset`, defaulting to five percent.
+with `restic check --read-data-subset`, defaulting to five percent, and writes a
+root-only secret-redacted receipt containing the full snapshot ID, snapshot
+time, source host, repository commit and dirty state, backup timestamp, and
+check scope.
 
 The local archive contains Nextcloud's `config.php`, which itself contains
 database/cache credentials. Local backups therefore remain mode `0700` and
@@ -28,9 +40,10 @@ restic versions below the tested baseline.
 Select a target that is physically and administratively independent of the
 NUC. A second directory on the same NVMe is not offsite.
 
-## Google Drive target
+## Example backend: Google Drive
 
-Google Drive is connected through restic's rclone backend. Restic performs
+Google Drive can be connected through restic's rclone backend after explicit
+provider approval. Restic performs
 encryption and deduplication locally; Drive stores the resulting repository
 objects. Use a dedicated rclone remote named `gdrive` and the `drive.file`
 scope. That scope permits access to files created by this rclone identity
@@ -57,7 +70,7 @@ the resulting config into Git, chat, an issue, or a log.
 Set the protected repository file to exactly:
 
 ```text
-rclone:gdrive:workspace-suite/nextcloud-restic
+rclone:gdrive:essentials-office/nextcloud-restic
 ```
 
 Set `RCLONE_CONFIG=/etc/nextcloud/rclone.conf` in
@@ -93,7 +106,7 @@ sudo ./scripts/offsite-backup.sh --init
 For an existing restic repository, omit `--init`. A successful upload is not a
 restore test.
 
-## Disposable restore test
+## Local disposable restore test
 
 The restore test extracts only the expected archive roots into a newly created
 `/tmp/nextcloud-restore-test.*` directory. It starts PostgreSQL, Redis, and
@@ -108,23 +121,40 @@ cd /opt/nextcloud
 sudo ./scripts/restore-test.sh
 ```
 
-To prove offsite recovery, stage a restic snapshot with the same protected
-configuration. The script creates a new unique directory and never overwrites
-an earlier restore:
+This same-host test is class 6 or 7 evidence only. To prove class 8 offsite
+recovery, move to a machine or VM physically and administratively independent
+of the NUC. Stage a real Restic snapshot there with the same protected
+configuration. The script creates a unique empty directory and never
+overwrites an earlier restore:
 
 ```bash
 cd /opt/nextcloud
 sudo ./scripts/offsite-restore-stage.sh
-sudo RESTORE_ENV_FILE=/srv/nextcloud/restore-output/restic-restore.<ID>/opt/nextcloud/.env \
+sudo RESTORE_RTO_STARTED_AT_UTC=<incident-declaration-utc> \
+  RESTORE_SOURCE_EVIDENCE_FILE=<protected-offsite-snapshot-receipt> \
+  RESTORE_SOURCE_SNAPSHOT_ID=<snapshot-id> \
+  RESTORE_INDEPENDENT_INFRASTRUCTURE=true \
+  RESTORE_STAGE_DIRECTORY=/srv/nextcloud/restore-output/restic-restore.<ID> \
+  RESTORE_EVIDENCE_OUTPUT=/var/lib/essentials-office/evidence/last-independent-restore.json \
+  RESTORE_ENV_FILE=/srv/nextcloud/restore-output/restic-restore.<ID>/opt/nextcloud/.env \
   /opt/nextcloud/scripts/restore-test.sh \
   /srv/nextcloud/restore-output/restic-restore.<ID>/srv/nextcloud/backups/<UTC_TIMESTAMP>
-sudo ./scripts/cleanup-restore-stage.sh \
+sudo RESTORE_EVIDENCE_FILE=/var/lib/essentials-office/evidence/last-independent-restore.json \
+  ./scripts/cleanup-restore-stage.sh \
   /srv/nextcloud/restore-output/restic-restore.<ID>
 ```
 
 The cleanup is deliberately explicit and accepts only a generated direct child
 of `/srv/nextcloud/restore-output`. It contains decrypted secrets and backup
-data; after removal it is not locally recoverable.
+data; after removal it is not locally recoverable. The guarded cleanup updates
+the receipt only after deletion. The restore receipt records duration, core/app
+versions, core integrity, database, Redis, cron, WebDAV upload/download/delete,
+share metadata, stable HR/Intranet objects when present, and cleanup state. An
+independent receipt also binds the supplied full snapshot ID and timestamp to
+the protected metadata written by the staging script. Its RTO duration begins
+at the explicitly recorded incident declaration, must precede Restic staging,
+and ends only after service validation. See
+`docs/operations/OFFSITE_ACCEPTANCE.md` for the complete acceptance boundary.
 
 ## Scheduling
 

@@ -24,7 +24,10 @@ Important caveats:
 - Runtime claims are dated observations until verified on the target host.
 - Preserve `/opt/nextcloud`, `/srv/nextcloud`, shared Caddy, and `proxy_net`.
 - Never print or commit `.env` values, DDNS credentials, backups, or user data.
-- mailcow has an independent lifecycle and must not be copied into `compose.yaml`.
+- Mail is only an external IMAP/SMTP integration boundary; do not install
+  mailcow or another mail platform from this repository.
+- Do not add modules while deployed revision, drift, independent recovery,
+  RPO/RTO ownership, ingress, and update/rollback remain open.
 - Do not reload shared Caddy until its complete configuration has been reconciled
   and validated.
 

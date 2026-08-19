@@ -44,16 +44,16 @@ cleanup() {
     kill "$CHROMEDRIVER_PID" >/dev/null 2>&1 || true
     wait "$CHROMEDRIVER_PID" 2>/dev/null || true
   fi
-  if [ -n "$WORK_DIR" ] && [[ "$WORK_DIR" == /tmp/workspace-suite-deploy-test.* ]]; then
+  if [ -n "$WORK_DIR" ] && [[ "$WORK_DIR" == /tmp/essentials-office-deploy-test.* ]]; then
     if [ -f "$WORK_DIR/.env" ]; then
       docker compose --project-directory "$WORK_DIR" down --volumes --remove-orphans >/dev/null 2>&1 || true
     fi
     rm -rf -- "$WORK_DIR"
   fi
-  if [ -n "$PROXY_NETWORK" ] && [[ "$PROXY_NETWORK" == workspace-suite-test-proxy-* ]]; then
+  if [ -n "$PROXY_NETWORK" ] && [[ "$PROXY_NETWORK" == essentials-office-test-proxy-* ]]; then
     docker network rm "$PROXY_NETWORK" >/dev/null 2>&1 || true
   fi
-  if [ -n "$DATA_ROOT" ] && [[ "$DATA_ROOT" == /tmp/workspace-suite-deploy-data.* ]]; then
+  if [ -n "$DATA_ROOT" ] && [[ "$DATA_ROOT" == /tmp/essentials-office-deploy-data.* ]]; then
     rm -rf -- "$DATA_ROOT"
   fi
   exit "$status"
@@ -79,7 +79,7 @@ if [ "${EUID}" -ne 0 ]; then
   fi
   die 'run as root or install sudo for disposable bind-mount ownership setup'
 fi
-for command in awk chmod cmp cp curl docker find jq mktemp openssl rg rsync sed sha256sum sort xargs; do
+for command in awk chmod cmp cp curl docker find git jq mktemp openssl rg rsync sed seq sha256sum sleep sort xargs; do
   command -v "$command" >/dev/null 2>&1 || die "required command not found: $command"
 done
 if [ "$WITH_BROWSER" = true ]; then
@@ -94,11 +94,19 @@ if [ "$WITH_RECOVERY" = true ]; then
   command -v restic >/dev/null 2>&1 || die 'recovery test requires restic'
 fi
 
-WORK_DIR=$(mktemp -d /tmp/workspace-suite-deploy-test.XXXXXX)
-DATA_ROOT=$(mktemp -d /tmp/workspace-suite-deploy-data.XXXXXX)
+if git -c safe.directory="$SOURCE_DIR" -C "$SOURCE_DIR" \
+  rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+  && [ -z "$(git -c safe.directory="$SOURCE_DIR" -C "$SOURCE_DIR" status --porcelain)" ]; then
+  export BACKUP_REPOSITORY_COMMIT
+  export BACKUP_SOURCE_TREE_IS_COMMIT=true
+  BACKUP_REPOSITORY_COMMIT=$(git -c safe.directory="$SOURCE_DIR" -C "$SOURCE_DIR" rev-parse HEAD)
+fi
+
+WORK_DIR=$(mktemp -d /tmp/essentials-office-deploy-test.XXXXXX)
+DATA_ROOT=$(mktemp -d /tmp/essentials-office-deploy-data.XXXXXX)
 suffix=${WORK_DIR##*.}
-PROJECT_NAME=workspace-suite-test-"${suffix,,}"
-PROXY_NETWORK=workspace-suite-test-proxy-"${suffix,,}"
+PROJECT_NAME=essentials-office-test-"${suffix,,}"
+PROXY_NETWORK=essentials-office-test-proxy-"${suffix,,}"
 
 rsync -a \
   --exclude='.git/' \
@@ -179,6 +187,12 @@ webdav_verify_and_remove() {
   local admin download_file
   admin=$(awk -F= '$1 == "NEXTCLOUD_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
   download_file="$WORK_DIR/synthetic-persistence.download"
+  # The update rehearsal deliberately recreates the app container. Reinstall
+  # only the disposable probe credential into its ephemeral /tmp; the remote
+  # WebDAV object itself must have survived through persistent Nextcloud data.
+  [ -f "$WORK_DIR/.webdav.netrc" ] || die 'disposable WebDAV credential fixture is missing'
+  compose cp "$WORK_DIR/.webdav.netrc" app:/tmp/essentialsplus-webdav.netrc >/dev/null
+  compose exec -T app chmod 0600 /tmp/essentialsplus-webdav.netrc
   compose exec -T app curl --fail --silent --show-error \
     --netrc-file /tmp/essentialsplus-webdav.netrc \
     --header 'Host: deploy-test.invalid' \
@@ -238,7 +252,16 @@ run_browser_e2e() {
   fi
   "$chromedriver_bin" --port=9515 --allowed-ips=127.0.0.1 >/dev/null 2>&1 &
   CHROMEDRIVER_PID=$!
-  sleep 1
+  webdriver_ready=false
+  for _ in $(seq 1 40); do
+    if curl --fail --silent --show-error http://127.0.0.1:9515/status \
+      | jq -e '.value.ready == true' >/dev/null 2>&1; then
+      webdriver_ready=true
+      break
+    fi
+    sleep 0.25
+  done
+  [ "$webdriver_ready" = true ] || die 'ChromeDriver did not become ready'
   BROWSER_BASE_URL="$browser_base" \
   BROWSER_CORE_ENV_FILE="$WORK_DIR/.env" \
   BROWSER_USER_ENV_FILE="$browser_secret_file" \
@@ -251,7 +274,7 @@ run_browser_e2e() {
 }
 
 run_recovery_e2e() {
-  local recovery_user recovery_password admin admin_password netrc source_file shares backup_dir restic_stage staged_backup staged_env
+  local recovery_user recovery_password admin admin_password netrc source_file shares backup_dir restic_stage staged_backup staged_env key value snapshot_id restore_receipt
   recovery_user=recovery-demo
   recovery_password=$(openssl rand -hex 32)
   admin=$(awk -F= '$1 == "NEXTCLOUD_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
@@ -289,6 +312,20 @@ run_recovery_e2e() {
   BACKUP_DIR="$DATA_ROOT/backups" "$WORK_DIR/scripts/backup.sh"
   backup_dir=$(find "$DATA_ROOT/backups" -mindepth 1 -maxdepth 1 -type d -name '20*' -print | sort | tail -n 1)
   [ -n "$backup_dir" ] || die 'recovery test backup is missing'
+  jq -e '.services | all(.[]; ((.environment // {}) | all(.[]; . == "[REDACTED]")))' \
+    "$backup_dir/compose.resolved.redacted.json" >/dev/null ||
+    die 'backup Compose metadata is not fully environment-redacted'
+  jq -e '.repository.dirty == false and
+    (.images | length == 3 and all(.[]; .requested | test("@sha256:[0-9a-f]{64}$"))) and
+    (.runningImages | length == 4 and all(.[]; .imageId | test("^sha256:[0-9a-f]{64}$")))' \
+    "$backup_dir/versions.json" >/dev/null || die 'backup image evidence lacks exact requested digests'
+  for key in POSTGRES_PASSWORD NEXTCLOUD_ADMIN_PASSWORD REDIS_PASSWORD; do
+    value=$(awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
+    [ -n "$value" ] || die "missing disposable backup secret: $key"
+    if rg -F -- "$value" "$backup_dir/compose.resolved.redacted.json" "$backup_dir/versions.json" >/dev/null; then
+      die "backup metadata leaked a disposable secret: $key"
+    fi
+  done
   export RESTIC_REPOSITORY="$WORK_DIR/restic-repository"
   export RESTIC_PASSWORD_FILE="$WORK_DIR/.restic-password"
   openssl rand -base64 48 >"$RESTIC_PASSWORD_FILE"
@@ -296,13 +333,33 @@ run_recovery_e2e() {
   restic init >/dev/null
   restic backup --quiet --tag essentialsplus-office-recovery "$backup_dir" "$WORK_DIR/.env"
   restic check --read-data >/dev/null
-  restic_stage="$WORK_DIR/restic-stage"
+  snapshot_id=$(restic snapshots --latest 1 --json | jq -r '.[0].id')
+  [[ "$snapshot_id" =~ ^[0-9a-f]{64}$ ]] || die 'local Restic test did not produce a full snapshot ID'
+  restic_stage="$WORK_DIR/restic-restore.local"
   restic restore latest --target "$restic_stage" >/dev/null
   staged_backup=$(find "$restic_stage" -type d -name "$(basename -- "$backup_dir")" -path '*/backups/*' -print -quit)
   staged_env=$(find "$restic_stage" -type f -name .env -print -quit)
   [ -n "$staged_backup" ] && [ -n "$staged_env" ] || die 'restic restore did not reproduce backup and environment files'
-  RESTORE_ENV_FILE="$staged_env" "$WORK_DIR/scripts/restore-test.sh" "$staged_backup"
-  printf 'deploy-test: encrypted temporary restic backup and full empty-target restore passed\n'
+  restore_receipt="$WORK_DIR/local-restore-receipt.json"
+  RESTORE_ENV_FILE="$staged_env" \
+    RESTORE_SOURCE_SNAPSHOT_ID="$snapshot_id" \
+    RESTORE_INDEPENDENT_INFRASTRUCTURE=false \
+    RESTORE_STAGE_DIRECTORY="$restic_stage" \
+    RESTORE_EVIDENCE_OUTPUT="$restore_receipt" \
+    "$WORK_DIR/scripts/restore-test.sh" "$staged_backup"
+  jq -e --arg snapshotId "$snapshot_id" '
+    .independentInfrastructure == false and .cleanupRecorded == false and
+    .sourceSnapshotId == $snapshotId and
+    (.durationSeconds | type == "number") and
+    (.checks | all(.[]; . == true)) and
+    (.nextcloud.version | type == "string" and length > 0)' "$restore_receipt" >/dev/null ||
+    die 'local restore receipt is incomplete or overclaims independence'
+  OFFSITE_RESTORE_STAGE_ROOT="$WORK_DIR" RESTORE_EVIDENCE_FILE="$restore_receipt" \
+    "$WORK_DIR/scripts/cleanup-restore-stage.sh" "$restic_stage" >/dev/null
+  [ ! -e "$restic_stage" ] || die 'guarded Restic staging cleanup left decrypted data'
+  jq -e '.cleanupRecorded == true and (.cleanupAtUtc | type == "string")' "$restore_receipt" >/dev/null ||
+    die 'guarded Restic cleanup was not recorded'
+  printf 'deploy-test: encrypted temporary Restic backup, receipt, full empty-target restore, and guarded cleanup passed\n'
 }
 
 run_hr_e2e() {
@@ -570,6 +627,55 @@ run_module_control_tests() {
   printf 'deploy-test: OCC/API control, health gates, shared visibility, disable preservation, and metrics passed\n'
 }
 
+run_deployment_state_collection() {
+  local state_dir="$WORK_DIR/deployment-state" key value
+  CADDY_PROJECT_DIR="$WORK_DIR/no-caddy-project" \
+    "$WORK_DIR/scripts/collect-deployment-state.sh" "$state_dir" >/dev/null
+  jq -e '
+    .schemaVersion == "1.0.0" and
+    .repository.commit != null and
+    .compose.renderedSha256 != null and
+    .compose.effectiveConfigurationSha256 != null and
+    (.runtime.containers | length) >= 4 and
+    (.runtime.images | length) == 3 and
+    .nextcloud.status.installed == true and
+    .nextcloud.database.hasMigrationsTable == true and
+    .nextcloud.cron.backgroundMode == "cron" and
+    .caddy.diskRuntime == "unavailable"
+  ' "$state_dir/deployment-state.json" >/dev/null || die 'deployment state JSON is incomplete'
+  (cd "$state_dir" && sha256sum --check deployment-state.sha256 >/dev/null) ||
+    die 'deployment state checksums failed'
+  for key in POSTGRES_PASSWORD NEXTCLOUD_ADMIN_PASSWORD REDIS_PASSWORD; do
+    value=$(awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
+    [ -n "$value" ] || die "missing disposable secret for redaction check: $key"
+    if rg -F -- "$value" "$state_dir" >/dev/null; then
+      die "deployment state leaked a disposable secret: $key"
+    fi
+  done
+  printf 'deploy-test: read-only JSON/Markdown/SHA deployment state and secret redaction passed\n'
+}
+
+run_update_rehearsal() {
+  local report
+  local -a update_reports=()
+  for _ in 1 2; do
+    UPDATE_HEALTHCHECK_MODE=core-only \
+      UPDATE_REPORT_ROOT="$WORK_DIR/update-reports" \
+      ESSENTIALS_OFFICE_UPDATE_DISPOSABLE=true \
+      "$WORK_DIR/scripts/update.sh" >/dev/null
+    sleep 1
+  done
+  mapfile -t update_reports < <(find "$WORK_DIR/update-reports" -type f -name update-result.json -print | sort)
+  [ "${#update_reports[@]}" -eq 2 ] || die 'two disposable update receipts were not created'
+  for report in "${update_reports[@]}"; do
+    jq -e '.result == "passed" and .before == .after and .dataRestorePerformed == false' \
+      "$report" >/dev/null || die "disposable update receipt failed: $report"
+  done
+  occ status --output=json | jq -e '.maintenance == false and .needsDbUpgrade == false' >/dev/null ||
+    die 'disposable update left Nextcloud in maintenance or upgrade state'
+  printf 'deploy-test: repeated exact-pin update, backup, health, maintenance exit, and image idempotence passed\n'
+}
+
 run_app_failure_mode_tests() {
   local incompatible_catalog missing_catalog failure_log
   incompatible_catalog="$WORK_DIR/app-catalog-incompatible.json"
@@ -607,6 +713,7 @@ if [ "$WITH_TALK" = true ]; then
   prepare_talk_e2e
 fi
 run_module_control_tests
+run_deployment_state_collection
 if [ "$WITH_TALK" = true ]; then
   run_talk_e2e
 fi
@@ -638,6 +745,9 @@ occ app:list --output=json \
   >"$WORK_DIR/app-state.after.json"
 cmp -- "$WORK_DIR/module-state.before.json" "$WORK_DIR/module-state.after.json" || die 'module state is not semantically idempotent'
 cmp -- "$WORK_DIR/app-state.before.json" "$WORK_DIR/app-state.after.json" || die 'declared app state is not semantically idempotent'
+if [ "$WITH_RECOVERY" = true ]; then
+  run_update_rehearsal
+fi
 webdav_verify_and_remove
 if [ "$WITH_RECOVERY" = true ]; then
   run_recovery_e2e
