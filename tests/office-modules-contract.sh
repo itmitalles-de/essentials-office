@@ -35,7 +35,8 @@ Draft202012Validator(schema).validate(contract)
 PY
 else
   docker run --rm --network none --entrypoint python \
-    -v "$PROJECT_DIR:/repo:ro" python:3.13-alpine \
+    -v "$PROJECT_DIR:/repo:ro" \
+    python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d \
     -c 'import json; contract=json.load(open("/repo/office-modules.json")); assert contract["schemaVersion"] == "1.0.0"' ||
     die 'minimal schema fallback failed'
 fi
@@ -72,8 +73,13 @@ jq -e '
   ([.modules[] | select(.id == "talk") | .nextcloudApps[] |
     select(.visibilityMode == "platform-global") | .id] == ["spreed"]) and
   ([.modules[] | select(.id == "vaultwarden") | .composeServices] == [["vaultwarden"]]) and
+  ([.modules[] | select(.id == "mail") | .externalServices[].id] == ["imap-smtp-provider"]) and
   ([.modules[] | select(.id == "essentials-calls") | .externalServices[0].repository] == ["itmitalles-de/visual-pbx"])
 ' "$CONTRACT" >/dev/null || die 'module contract violates an Essentials+ Office invariant'
+
+if rg -ni 'mailcow|mail platform installation' "$CONTRACT" >/dev/null; then
+  die 'Mail must remain a provider-neutral IMAP/SMTP integration boundary'
+fi
 
 compose_services=$(jq -r '.services | keys[]' < <(
   POSTGRES_PASSWORD=placeholder NEXTCLOUD_ADMIN_PASSWORD=placeholder REDIS_PASSWORD=placeholder \
@@ -81,7 +87,7 @@ compose_services=$(jq -r '.services | keys[]' < <(
   NEXTCLOUD_TRUSTED_DOMAINS=cloud.itmitalles.de TRUSTED_PROXIES=172.18.0.0/16 \
   docker compose -f "$PROJECT_DIR/compose.yaml" config --format json
 ))
-if printf '%s\n' "$compose_services" | grep -Eiq 'vaultwarden|collabora|turn|mailcow|visual.?pbx|calls'; then
+if printf '%s\n' "$compose_services" | grep -Eiq 'vaultwarden|collabora|turn|hpb|mailcow|visual.?pbx|calls'; then
   die 'the base Compose model unexpectedly contains an optional service'
 fi
 if rg -n 'reverse_proxy[[:space:]].*(visual-pbx|essentials-calls|\bpbx\b)' \

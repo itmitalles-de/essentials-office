@@ -41,7 +41,7 @@ run_client() {
     --env TURN_HOST=turn --env TURN_SECRET_FILE=/run/secrets/turn \
     --volume "$secret_file:/run/secrets/turn:ro" \
     --volume "$PROJECT_DIR/tests/fakes/turn_client.py:/test.py:ro" \
-    python:3.13-alpine python /test.py
+    python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d python /test.py
 }
 
 for command in docker find openssl; do command -v "$command" >/dev/null 2>&1 || exit 1; done

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal raw-WebDriver browser acceptance for the disposable Office instance."""
+"""Minimal raw-WebDriver acceptance for a disposable Essentials+ Office instance."""
 
 from __future__ import annotations
 
@@ -42,11 +42,13 @@ class WebDriver:
             headers={"Content-Type": "application/json", "Accept": "application/json"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=20) as response:
+            with urllib.request.urlopen(request, timeout=30) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
             fail(f"WebDriver HTTP {error.code}: {detail[:300]}")
+        except (TimeoutError, urllib.error.URLError, OSError) as error:
+            fail(f"WebDriver transport failed for {method} {path}: {error}")
         value = result.get("value")
         if isinstance(value, dict) and value.get("error"):
             fail(f"WebDriver {value['error']}: {value.get('message', '')}")
@@ -60,6 +62,8 @@ class WebDriver:
                 "capabilities": {
                     "alwaysMatch": {
                         "browserName": "chrome",
+                        "pageLoadStrategy": "none",
+                        "timeouts": {"implicit": 0, "pageLoad": 90000, "script": 30000},
                         "goog:chromeOptions": {
                             "binary": chromium,
                             "args": [
@@ -127,8 +131,19 @@ class WebDriver:
         value = self.request("GET", f"/session/{self.session_id}/source")
         return value if isinstance(value, str) else ""
 
+    def diagnostic(self) -> str:
+        if not self.session_id:
+            return "session=not-created"
+        try:
+            value = self.execute(
+                "return {path: window.location.pathname, title: document.title, readyState: document.readyState}"
+            )
+            return json.dumps(value, sort_keys=True)
+        except Exception as error:
+            return f"diagnostic-unavailable={error}"
 
-def wait_for(predicate, message: str, timeout: int = 45) -> None:
+
+def wait_for(predicate, message: str, timeout: int = 90) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -209,6 +224,9 @@ def run_session(
             time.sleep(1)
             if '"contractVersion"' in driver.source():
                 fail("ordinary user reached the administrator module API")
+    except Exception as error:
+        role = "administrator" if admin else "ordinary-user"
+        fail(f"{role} flow failed: {error}; {driver.diagnostic()}")
     finally:
         driver.stop()
 
