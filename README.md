@@ -42,7 +42,8 @@ its current NUC state is unknown.
 | NUC core, local backup, and Caddy disk/runtime state | 2026-08-13 | historical host recorded only as `NUC` | `3888bae` | read-only SSH inventory plus local backup/restore | Historical only; hostname was not retained and the current deployed commit is unknown. |
 | Full disposable Office and local encrypted Restic restore | 2026-08-13 | GitHub-hosted runner | `520c239` | Actions run `31730633740` | Synthetic and same-runner only; not offsite or live evidence. |
 | Latest `main` CI | 2026-08-13 | GitHub-hosted runner | `17081f20704e77dea6d1c983bdf8f2bde779e8f2` | Actions run `31735217485` | Failed in Admin Center Browser-E2E; other jobs passed. |
-| Public DNS/ingress | 2026-08-18T23:53:19Z | external Codex runner | working tree based on `17081f2` | `check-external-ingress.sh`, expected strategy `either` | No A or AAAA records; TCP, TLS, HTTP, DAV, and upload-path checks were therefore not applicable. |
+| Operational-gates code-head CI | 2026-08-19 | GitHub-hosted runner | `2a26fc9c1df1c016294b2f83f57b87ad62fabfc7` | Actions run `32203617530` | All five jobs passed; synthetic classes 1–7 only, not live gates. |
+| Public DNS/ingress | 2026-08-19T00:39:49Z | external Codex runner | clean `5bc726c7dedceb0f4d59d2d7d3da22555ead9188` | `check-external-ingress.sh`, expected strategy `either` | No A or AAAA records; TCP, TLS, HTTP, DAV, and upload-path checks were therefore not applicable. |
 | Current NUC revision, drift, offsite restore, and production state | 2026-08-19 | no authorized target alias identified | `unknown` | safe access discovery | Open, not inferred from historical documentation. |
 
 See the [verification matrix](docs/VERIFICATION_MATRIX.md) for the eleven
@@ -163,13 +164,16 @@ refer only to a verified, routable ingress address; a Tailscale address is not a
 public DNS target. Do not infer forwardable IPv4 from an outbound address, and
 do not infer IPv6 ingress from a locally assigned address.
 
-The current external observation is dated 2026-08-18T23:53:19Z and was made by
-an external Codex runner against a working tree based on `17081f2`, using
+The current external observation is dated `2026-08-19T00:39:49Z` and was made
+by an external Codex runner from a clean worktree at
+`5bc726c7dedceb0f4d59d2d7d3da22555ead9188`, using
 `scripts/check-external-ingress.sh` with the minimal `either` strategy. It found
 neither `A` nor `AAAA` for `cloud.itmitalles.de`; therefore TCP, TLS, HTTP, DAV,
-and upload-path checks were not applicable. This proves only that the service
-was not publicly live at that observation; it says nothing about the NUC or
-router.
+and upload-path checks were not applicable. The generated JSON had SHA-256
+`7d8e8018a9b7ce802f2bec021e8c41b1d360551e270bb6e522e33759fd39efb2`.
+This proves only that the service was not publicly live at that observation;
+it says nothing about the NUC or router. The actual address-family strategy
+remains an operator decision; `either` was only the minimum availability probe.
 
 After an operator declares the intended `ipv4-only`, `ipv6-only`, `dual-stack`,
 or `either` strategy, run the external checker from a genuinely external

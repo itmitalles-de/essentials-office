@@ -1,93 +1,68 @@
 # TODO
 
-This is the authoritative repository handoff. Do not create a competing root
-task list, infer live state from dated evidence, or touch production systems.
+This is the authoritative repository handoff. Operational/recovery gates take
+priority over feature work. Never infer live state from historical or synthetic
+evidence.
 
-## Now — documentation and remaining depth
+## Current branch completion
 
-- [x] Finish the disposable TLS Vaultwarden browser flow: synthetic account
-  login, organization, collection, owner/member roles, and group; then rerun
-  consistent SQLite backup, checksum verification, encrypted temporary Restic
-  roundtrip, and restore to a completely empty target.
-- [x] Run the combined clean deployment harness with automated browser Admin
-  Center, recovery, HR Lite, Intranet Lite, and Talk flows. Prove second-run
-  idempotence, permissions, restart persistence, WebDAV data/share recovery,
-  content/volume preservation across logical module deactivation, and complete
-  resource cleanup. Exact-head GitHub Actions run `31730633740` passed all four
-  jobs for `520c239`; its 13m25s combined job completed the automated browser,
-  second deployment, encrypted temporary Restic, empty-target restore,
-  WebDAV/share, cron, and cleanup path.
-- [x] Correct every failure found by that combined run. Do not weaken assertions
-  merely to make the suite green, and do not claim app-specific objects that
-  could not be provisioned through supported interfaces.
-- [x] Inspect the complete diff against current `origin/main`. The branch is 17
-  commits ahead and 0 behind, with 128 intended changed files; PR #2 has no
-  review or issue comments. Exact-head static validation and full-history
-  Gitleaks passed.
-- [ ] Update visible branding and documentation to **Essentials+ Office**:
-  README, architecture, operations, backup/restore, security, module overview,
-  `docs/CODEX_PROMPT.md`, changelog, agent decisions/architecture, and handoff.
-- [ ] Create `docs/VERIFICATION_MATRIX.md` with the exact evidence classes:
-  static, synthetic Compose, browser E2E, backup/restore, local fake service,
-  NUC, public external, and production. Mark unsupported claims as unverified.
-- [ ] Create `docs/NICE_TO_HAVE.md` containing only the requested future items;
-  add no code, stubs, images, or dependencies for them.
-- [x] Push the focused handoff and validation fixes to
-  `agent/essentials-office-autonomous`. Code and dated verification evidence are
-  pushed through runtime head `520c239` plus the following handoff-only update;
-  inspect GitHub for the live state of superseding PR #2.
+- [x] Inspect `main`, `origin/main`, open PRs, remote branches, recent merges,
+  Actions, repository instructions, and handoff statements.
+- [x] Complete the Essentials+ Office/repository rename while preserving
+  technical compatibility identifiers.
+- [x] Add the eleven-class verification matrix and ideas-only nice-to-have file.
+- [x] Add read-only deployment collection and fail-closed drift comparison.
+- [x] Add real external IPv4/IPv6 DNS/TCP/TLS/HTTP/DAV inspection tooling.
+- [x] Add offsite snapshot and independent-restore receipts plus acceptance,
+  service-objective, and Caddy-drift runbooks.
+- [x] Pin core/test images by exact tag and digest; retain exact Action SHAs;
+  add SBOM and supply-chain policy checks.
+- [x] Rehearse allowed same-major pins, major refusal, backup-before-pull,
+  failed pull/start/health, maintenance exit, exact-image rollback, data-marker
+  preservation, and repeated idempotence.
+- [x] Run the current local static suite and record its evidence boundary.
+- [x] Confirm exact-code-head Actions run `32203617530`: all five jobs passed.
+  Local full disposable execution could not start without interactive host
+  `sudo`; the class 3–7 claim comes only from GitHub Actions.
+- [x] Commit the focused change groups, push
+  `operations/office-external-gates`, and open a reviewable draft PR. Do not
+  merge it. Draft PR #4 is open.
+- [x] Update `.agent/STATE.md` with final commits, PR number, and the exact
+  code-head Actions source. GitHub remains authoritative for a later
+  documentation-only head run because recording that run would create another
+  commit and run recursively.
 
-## Functional gaps to resolve or document honestly
+## Mandatory external gates
 
-- [ ] Automate Collabora create/open/edit/reload through WOPI if it can be done
-  reproducibly without weakening the service boundary. Current evidence covers
-  only health, discovery, host allow-list, and restart recovery.
-- [x] Verify Talk P2P room/participant/message/permission flows in the combined
-  run. The disposable flow passes, including outsider rejection and logical
-  disable/reactivation data preservation. Keep TURN optional; implement
-  HPB only if cleanly reproducible and separated. Never infer real NAT/media
-  quality from a local test.
-- [x] Verify HR Lite fictional directory, onboarding/offboarding, absence,
-  responsibilities, templates, protected files, and least-privilege groups.
-- [ ] Verify Intranet Lite fictional content, editors/readers, confidential area,
-  search/API availability, backup/restore, and content-preserving deactivation.
-  Targeted activation/deactivation and content preservation pass; combined
-  Nextcloud restore remains unconfirmed at this pause.
-- [ ] Exercise Nextcloud Mail configuration against the synthetic TLS IMAP/SMTP
-  server or document the smallest supported remaining step. Do not embed mailcow.
-- [ ] Verify metrics, cron freshness, backup age, last restore evidence,
-  compatibility reporting, controlled patch/minor update, unexpected-major
-  refusal, and the disposable failed-update/rollback path.
+- [ ] Receive an approved NUC SSH alias with existing noninteractive
+  authentication; do not guess an IP, seek credentials, or modify SSH config.
+- [ ] Collect the deployed commit, dirty state, exact images/digests, versions,
+  Compose render, mounts, health, Caddy hashes/route, backup, restore, disk, and
+  inode state read-only.
+- [ ] Reconcile commit, Compose, image, module, and Caddy drift without reset,
+  pull, restart, reload, or overwrite.
+- [ ] Assign one responsible operator and approve or replace the proposed
+  24-hour RPO, 8-hour RTO, nightly backup, and quarterly restore schedule.
+- [ ] Approve an independent encrypted Restic target and protected credentials;
+  create and check a real snapshot without altering retention.
+- [ ] Restore that snapshot into a completely empty independent host/VM, pass
+  all acceptance checks, record elapsed RTO, and guard-clean decrypted staging.
+- [ ] Declare the intended IPv4/IPv6 strategy and repeat the ingress checker
+  from an external network after infrastructure is intentionally configured.
+- [ ] Reconcile complete shared-Caddy disk/runtime state and every existing site
+  before any authorized validate/reload/rollback change.
+- [ ] Rehearse the reviewed exact-pin update/rollback on staging or an authorized
+  disposable target before any live update.
 
-## Blocked — external mandatory gates
+## Optional depth only after mandatory gates
 
-- [ ] Compare the real running Caddy configuration with the repository file.
-- [ ] Verify public IPv4 and IPv6 reachability.
-- [ ] Verify TCP 80/443 from a genuinely external network.
-- [ ] Verify real DNS.
-- [ ] Verify real TLS certificates.
-- [ ] Verify actual NUC resources and runtime behavior.
-- [ ] Configure and prove a real encrypted offsite provider. A temporary local
-  Restic repository is not offsite evidence.
-- [ ] Verify production mail deliverability and PTR/rDNS.
-- [ ] Verify real Talk media quality through NAT.
-- [ ] Plan and verify the real Dropbox data migration.
+- [ ] Disposable Collabora WOPI create/open/edit/save/reload/content comparison.
+- [ ] Stable Intranet Lite post-restore object assertions beyond the current
+  supported synthetic files, if deterministic APIs exist.
+- [ ] Nextcloud Mail account flow against the existing synthetic TLS IMAP/SMTP
+  fixture; no mail platform installation.
+- [ ] Additional metrics freshness and update-failure coverage.
 
-## Recently completed
-
-- [x] Incorporated draft PR #1 instead of recreating it, merged current `main`
-  into the local work branch, and preserved the default branch/repository.
-- [x] Added the Essentials+ module manifest/reconciliation contract and safe
-  Nextcloud Admin Center/API/OCC implementation.
-- [x] Added separate optional Vaultwarden, Collabora, Talk/TURN, Mail, HR Lite,
-  Intranet Lite, and Essentials+ Calls boundaries with inactive defaults.
-- [x] Hardened secret handling, backup evidence, restore checks, metrics, image
-  major-version policy, fake service contracts, and disposable test harnesses.
-- [x] Proved the closed Vaultwarden product profile, TLS browser organization/
-  collection/role/group flow, encrypted backup, and empty-target restore with
-  synthetic data only.
-- [x] Passed the exact-head combined clean deployment, automated Admin/user
-  browser flow, HR/Intranet/Talk checks, second deployment, encrypted temporary
-  Restic roundtrip, and full empty-target Nextcloud restore in CI run
-  `31730633740`.
-- [x] Kept all real NUC, Caddy, DNS, network, backups, and user data untouched.
+Do not implement HPB, mailcow, OIDC/SSO, new HR/Intranet/Vaultwarden functions,
+new modules, migration, public registration, Kubernetes, or production data in
+this workstream.

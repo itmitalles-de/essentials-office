@@ -1,103 +1,102 @@
-# Validation report
+# Dated validation record
 
-Date: 2026-08-13 (Europe/Berlin)
+The authoritative status model is `docs/VERIFICATION_MATRIX.md`. Evidence does
+not inherit between its eleven classes.
 
-## Passed in the local disposable environment
+## Current branch checks — 2026-08-19
 
-- Base Compose, Collabora overlay, TURN overlay, and restore Compose all passed
-  `docker compose config -q` with non-secret validation placeholders.
-- Every shell script passed `bash -n` and ShellCheck 0.11.0.
-- The GitHub Actions workflow passed actionlint 1.7.12.
-- Gitleaks 8.30.1 found no leak in either the complete Git history or the
-  current working tree.
-- The TURN config installer ran twice with identical outputs, root ownership,
-  mode `0600`, and a generated 64-hex-character shared secret that was not
-  printed.
-- The Nextcloud App Store compatibility endpoint returned a compatible release
-  for every one of the eleven declared app IDs on Nextcloud 34.0.2.
-- Restic 0.19.1 initialized an encrypted disposable repository, backed up two
-  fixtures, completed `check --read-data`, restored the latest snapshot, and
-  reproduced both files byte-for-byte. The repository, password, and restore
-  output were then removed.
-- A fresh, isolated Nextcloud 34.0.2 source instance created a PostgreSQL dump
-  and `html`/`data` archive. `scripts/restore-test.sh` verified checksums,
-  restored them into a second internal-only Compose project, recreated the
-  dedicated Nextcloud database login without printing its password, passed
-  PostgreSQL/Redis/App health, and returned an installed, non-maintenance OCC
-  state. Both disposable projects and their data were removed.
+| Field | Value |
+| --- | --- |
+| Environment | local Codex workspace and GitHub-hosted runner |
+| Exact code head | `2a26fc9c1df1c016294b2f83f57b87ad62fabfc7` |
+| Method | local `scripts/validate-static.sh`; Actions run `32203617530` |
+| Result | all five jobs passed; current synthetic classes 1–7 pass |
+| Boundary | synthetic only; not the NUC, independent offsite restore, ingress success, or production |
 
-The first restore attempt exposed a real ownership defect in the earlier dump
-format: `--no-owner --no-privileges` made Nextcloud 34's separate `oc_admin*`
-database login unable to read restored tables. The final implementation keeps
-object ownership/ACL metadata and creates the config-declared login before
-`pg_restore`; the repeated end-to-end restore then passed.
+The static suite passed base/profile/restore Compose renders, Bash/ShellCheck,
+Python/JavaScript/PHP/JSON/XML parsing, Caddy validation, module contracts,
+exact image/action pin policies, full-history Gitleaks, SBOM pin policy,
+deployment-state comparison fixtures, patch/minor/major update policy, and
+failed-pull/start/health rollback rehearsal.
 
-## Verified external facts
+A full local disposable run was attempted but did not start because host `sudo`
+requires interactive authentication. No password was requested or supplied and
+no runtime state changed. Current class 3–7 evidence therefore comes only from
+the exact-code-head GitHub Actions run.
 
-- On 2026-08-13, public resolvers returned no `A` or `AAAA` record for
-  `cloud.itmitalles.de`; public HTTPS therefore remains intentionally open.
-- Namecheap nameservers remain authoritative for `itmitalles.de`.
+The first PR run, `32201954244` at `5bc726c`, passed static validation,
+secret-scan, SBOM, and isolated modules but failed in backup. It correctly
+stopped cron for consistency and then incorrectly required cron to be running
+while collecting image provenance. Commit `6e9ca74` moved app and image
+inventory to the backup start, before maintenance and cron stop; no recovery
+assertion was removed or weakened.
 
-## Passed on the NUC
+The subsequent run at `6e9ca74` was superseded when the fully pinned
+`actions/upload-artifact` runtime was updated from warning-producing v4.6.2 to
+official v7.0.1 at `1102168`.
 
-- The deployed checkout was clean at commit `3888bae`; its base Compose model
-  passed validation without changing the checkout.
-- Nextcloud 34.0.2, PostgreSQL 17, Redis 7, and cron were running. The core
-  healthchecks passed, maintenance mode was disabled, and no database upgrade
-  was pending.
-- The canonical JSON adapted from `/opt/caddy/Caddyfile` matched Caddy's live
-  admin API configuration. PostgreSQL and Redis exposed no host ports.
-- A new candidate-format backup, `20260812T233152Z`, completed and all of its
-  SHA-256 checksums passed. Cron resumed and maintenance mode was disabled.
-- `scripts/restore-test.sh` restored that live backup into internal-only
-  disposable PostgreSQL, Redis, and Nextcloud containers, preserved the
-  Nextcloud 34 database-role ownership model, and passed all health and OCC
-  checks. It removed the test containers and network afterward.
-- The measured idle footprint of the four core containers was approximately
-  111 MiB. The host had 13 GiB available RAM, unused 4 GiB swap, and 79 GiB
-  free disk space after backup.
-- The pinned installer downloaded restic 0.19.1 and rclone 1.75.0 from their
-  upstream release pages, verified the committed SHA-256 digests before
-  installation, and verified the installed versions. The Nextcloud core
-  remained healthy afterward.
-- The IaC deployment test created a separate checkout and data root, unique
-  core container names, a unique Compose project, and a unique external proxy
-  network. It deployed a fresh Nextcloud 34.0.2 instance, passed the internal
-  PostgreSQL/Redis/App/cron checks, compatibility-checked and installed all
-  eleven declared apps, restarted the application container, and applied the
-  same deployment a second time. The second run preserved `.env` byte-for-byte
-  and treated every app as already enabled. All disposable containers,
-  networks, secrets, and data were removed; the production core remained
-  healthy.
+Run `32202678355` at `1102168` then passed static, secret, SBOM, isolated
+modules, backup provenance, module/browser flows, redeployment, and two update
+rehearsals. It failed only when the post-update WebDAV persistence probe tried
+to reuse its disposable credential from the replaced app container's `/tmp`.
+Commit `2a26fc9` reprovisions only that protected synthetic probe credential;
+the persisted remote-object byte comparison and deletion remain unchanged.
+Run `32203617530` then passed all five jobs at that final code head. Its
+`disposable-office` job passed deployment, module and browser flows, read-only
+state/redaction, restart persistence, two exact-pin update rehearsals, WebDAV
+persistence, consistent backup, encrypted temporary Restic repository and full
+read check, empty-target restore with OCC/repair/core/database/Redis/cron/
+WebDAV/share/object checks, receipt validation, and guarded cleanup.
 
-The first IaC test exposed an initialization-order error in the newly
-parameterized backup path: the final path was computed before the data root was
-loaded. That test snapshot landed in one timestamped root directory. The exact
-temporary directory was removed, final-path calculation now occurs after
-validation, and the script explicitly rejects `/` as a backup root. The
-corrected path is covered by the repeated test.
+## Historical synthetic evidence — 2026-08-13
 
-## Not executed or not claimable
+GitHub Actions run `31730633740` on commit `520c239` passed static validation,
+the full-history secret scan, isolated modules, and the combined disposable
+Office job. The GitHub-hosted runner used fictional data and proved a clean
+Nextcloud deployment, app reconciliation, Admin Center/user browser journey,
+HR/Intranet/Talk protocol flows, restart persistence, second-run idempotence,
+consistent PostgreSQL/files backup, temporary encrypted Restic repository,
+and empty-target restore with OCC, database, Redis, cron, WebDAV bytes, share
+metadata, and cleanup.
 
-- The restic production target and credentials do not exist in repository
-  context, and Google OAuth has not yet been completed. Therefore no genuine
-  offsite upload or restore of an NUC backup was performed. The encrypted
-  disposable restic test and both synthetic and live backup restore tests
-  passed, but they do not replace an independent target.
-- WebDAV round-trip, app reconciliation, and restart persistence after app
-  installation remain gated on the completed offsite-recovery stage.
-- Collabora document/spreadsheet/concurrency/version tests, Talk P2P and
-  external TURN tests, and the complete demo journey require DNS, browser
-  clients, and the gated runtime services. They were not simulated.
-- No mailcow host passed the static-IP, PTR, port-25, resource, and port gates;
-  mailcow was neither cloned nor started.
+That is historical class 1–7 evidence. It is neither a real provider snapshot
+nor a restore on infrastructure independent of the NUC.
 
-## Resource statement
+The later `main` Actions run `31735217485` on commit
+`17081f20704e77dea6d1c983bdf8f2bde779e8f2` passed all jobs except the Admin
+Center browser step, which timed out after earlier disposable assertions. The
+current branch preserves those assertions and adds bounded waits and browser
+diagnostics; exact-code-head run `32203617530` passed that browser flow.
 
-The NUC exposes 14 GiB usable RAM and had about 13 GiB available at the idle
-sample; the Nextcloud core used approximately 111 MiB. This is a point sample,
-not a peak-load measurement. The Collabora overlay enforces a configurable
-default ceiling of two CPUs and 3 GiB RAM. mailcow remains excluded from the
-NUC and requires at least 6 GiB RAM plus 1 GiB swap before workload-specific
-headroom. Record peak CPU, RSS, swap, disk growth, and TURN bandwidth after
-each live stage.
+## Historical NUC evidence — 2026-08-13
+
+The host recorded only as `NUC` was observed read-only at clean commit
+`3888bae`. Core health, cron, local backup checksums, same-host disposable
+restore, disk/runtime Caddy equality, and absence of PostgreSQL/Redis host ports
+were recorded. The intended Caddy route was absent. Details and limitations are
+in `docs/operations/NUC_BASELINE.md`.
+
+This is stale class 6 and 9 evidence. The current host alias, deployed commit,
+dirty state, image digests, and drift are unknown.
+
+## Current external evidence — 2026-08-19T00:39:49Z
+
+From `external-codex-runner`, `scripts/check-external-ingress.sh` tested
+`cloud.itmitalles.de` with expected strategy `either` and certificate name
+`cloud.itmitalles.de`, using a clean worktree at
+`5bc726c7dedceb0f4d59d2d7d3da22555ead9188`. No `A` or `AAAA` records were
+returned, so TCP, TLS, HTTP, DAV, and upload-path checks were not applicable.
+The JSON SHA-256 was
+`7d8e8018a9b7ce802f2bec021e8c41b1d360551e270bb6e522e33759fd39efb2`.
+Result: class 10 fail/not publicly live at that time. `either` was only the
+minimum availability probe; the operator has not approved a final strategy.
+
+## Unaccepted gates
+
+- current deployed revision and configuration drift;
+- real encrypted offsite snapshot and repository-check receipt;
+- independent empty-target restore and timed RTO;
+- named operator and approved RPO/RTO;
+- successful real DNS/TLS/IPv4/IPv6/HTTP/DAV ingress;
+- live update and rollback acceptance;
+- production readiness.

@@ -60,13 +60,16 @@ tokens, users, shares, or file names. Compare it with
 Caddy runtime, stale backup, or stale restore is a stop condition, not authority
 to reset, pull, update, restart, or reload.
 
-## External observation — 2026-08-18T23:53:19Z
+## External observation — 2026-08-19T00:39:49Z
 
-An external Codex runner using `scripts/check-external-ingress.sh` against a
-working tree based on `17081f2` found no `A` or `AAAA` records for
-`cloud.itmitalles.de`. Consequently TCP 80/443, TLS, HTTP, DAV, and upload-path
-checks were not applicable. This is class 10 evidence that the service was not
-publicly live at that instant; it says nothing about local NUC health.
+An external Codex runner used `scripts/check-external-ingress.sh` from a clean
+worktree at commit `5bc726c7dedceb0f4d59d2d7d3da22555ead9188` and found no
+`A` or `AAAA` records for `cloud.itmitalles.de`. The report JSON had SHA-256
+`7d8e8018a9b7ce802f2bec021e8c41b1d360551e270bb6e522e33759fd39efb2`.
+Consequently TCP 80/443, TLS, HTTP, DAV, and upload-path checks were not
+applicable. This is class 10 evidence that the service was not publicly live at
+that instant; it says nothing about local NUC health. The `either` address
+strategy was a minimum availability probe, not an approved operator decision.
 
 ## Stop conditions
 
