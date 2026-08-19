@@ -187,6 +187,12 @@ webdav_verify_and_remove() {
   local admin download_file
   admin=$(awk -F= '$1 == "NEXTCLOUD_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' "$WORK_DIR/.env")
   download_file="$WORK_DIR/synthetic-persistence.download"
+  # The update rehearsal deliberately recreates the app container. Reinstall
+  # only the disposable probe credential into its ephemeral /tmp; the remote
+  # WebDAV object itself must have survived through persistent Nextcloud data.
+  [ -f "$WORK_DIR/.webdav.netrc" ] || die 'disposable WebDAV credential fixture is missing'
+  compose cp "$WORK_DIR/.webdav.netrc" app:/tmp/essentialsplus-webdav.netrc >/dev/null
+  compose exec -T app chmod 0600 /tmp/essentialsplus-webdav.netrc
   compose exec -T app curl --fail --silent --show-error \
     --netrc-file /tmp/essentialsplus-webdav.netrc \
     --header 'Host: deploy-test.invalid' \
