@@ -98,3 +98,10 @@ whether to commit. The next Appointments work should be limited to real-service
 acceptance (SMTP, proxy/rate limits, accessibility, backup/restore) or a
 separately approved roadmap item. Do not infer production readiness from the
 disposable evidence above.
+
+## Simple Business design-system contract
+
+- `.simple-business-design-system.json` pins the central UI source to commit
+  `e508cc2` and package version `0.1.0`; no rules are copied into this product.
+- Existing owned app UI remains legacy. Deterministic generated CSS/SVG and its
+  CI check wait for the central package; Nextcloud production stays Node-free.
