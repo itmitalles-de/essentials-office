@@ -44,6 +44,9 @@ printf 'essentialsplus_backup_timestamp_seconds %.0f\n' "${latest_backup:-0}"
 if "${compose[@]}" ps --status running --services | grep -Fxq app; then
   "${compose[@]}" exec -T -u www-data app php occ essentialsplus:metrics 2>/dev/null || true
   apps=$("${compose[@]}" exec -T -u www-data app php occ app:list --output=json)
+  if jq -e '.enabled | has("appointments")' <<<"$apps" >/dev/null; then
+    "${compose[@]}" exec -T -u www-data app php occ appointments:metrics 2>/dev/null || true
+  fi
   printf '%s\n' '# HELP essentialsplus_nextcloud_app_enabled Whether a manifest-declared Nextcloud app is enabled.' '# TYPE essentialsplus_nextcloud_app_enabled gauge'
   while IFS= read -r app; do
     enabled=$(jq -r --arg app "$app" 'if .enabled | has($app) then 1 else 0 end' <<<"$apps")

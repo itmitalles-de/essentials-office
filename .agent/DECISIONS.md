@@ -108,3 +108,58 @@ concept lacks production release gates.
 **Consequences:** Manual UI steps are documented and checked by target-state
 verification. No SQL hacks, standalone default wiki, PBX proxy, credentials,
 or shared data stores are introduced.
+
+## 2026-08-20 - Keep Appointments in a separate native app
+
+**Decision:** Implement Termine as the repository-owned Nextcloud app
+`appointments`, not inside the `essentialsplus` module-control app.
+
+**Reason:** Scheduling has its own public attack surface, domain schema, jobs,
+retention policy, and lifecycle. The control plane should keep orchestrating
+modules rather than owning their customer data.
+
+**Consequences:** Appointments reuses Nextcloud authentication, users, groups,
+database, mail, cron, and UI conventions, but can be logically disabled without
+deleting its data. Its tables and routes use an explicit tenant boundary.
+
+## 2026-08-20 - Serialize booking writes per organization
+
+**Decision:** Every booking, reschedule, cancellation, and availability write
+locks the matching organization row in a database transaction and reruns the
+complete server-side availability calculation before committing.
+
+**Reason:** Small organizations need correctness more than maximum write
+parallelism. A deterministic organization lock is supported by Nextcloud's
+database abstraction and avoids a PostgreSQL-only exclusion implementation.
+
+**Consequences:** Two workers cannot confirm the same staff/resource slot.
+Conflicts return HTTP 409. Any future finer-grained lock strategy must retain
+the same one-winner invariant and include a migration/recovery plan.
+
+## 2026-08-20 - Use fragment-delivered, hash-only customer tokens
+
+**Decision:** Customer management links carry the raw random token only in the
+URL fragment. The browser removes it immediately and submits it in POST bodies;
+only a SHA-256 digest is stored.
+
+**Reason:** Fragments do not enter HTTP access logs, while POST-only management
+operations avoid bearer tokens in query strings and referrers.
+
+**Consequences:** Tokens are appointment-scoped, revocable, expiring, and
+fail closed after anonymization. Public numeric database identifiers are never
+an authorization mechanism.
+
+## 2026-08-20 - Keep Appointments authoritative for the first milestone
+
+**Decision:** Generate ICS from the authoritative appointment record and keep
+CalendarProvider and MeetingProvider disabled until a reviewed CalDAV/Talk
+implementation exists.
+
+**Reason:** The available Nextcloud calendar API does not provide a dependable
+generic event update/delete contract, and the repository had no native Talk
+provider. Silent partial synchronization would be less safe than an explicit
+boundary.
+
+**Consequences:** The milestone includes current ICS exports and attachments,
+but does not claim external busy import, CalDAV update/delete, or automatic
+meeting links. Those capabilities stay visible as documented roadmap work.

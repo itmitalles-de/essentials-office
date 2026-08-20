@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>appointments</id>
+    <name>Appointments</name>
+    <summary>Multi-organization appointment scheduling for Essentials+ Office.</summary>
+    <description>Provides services, availability, public booking, secure customer management, resources, reminders, and calendar exports.</description>
+    <version>1.0.0</version>
+    <licence>agpl</licence>
+    <author>itmitalles.de</author>
+    <namespace>Appointments</namespace>
+    <category>organization</category>
+    <dependencies>
+        <nextcloud min-version="34" max-version="34"/>
+    </dependencies>
+    <background-jobs>
+        <job>OCA\Appointments\BackgroundJob\OutboxSweepJob</job>
+        <job>OCA\Appointments\BackgroundJob\ReminderSweepJob</job>
+        <job>OCA\Appointments\BackgroundJob\RetentionJob</job>
+    </background-jobs>
+    <commands>
+        <command>OCA\Appointments\Command\SeedDemo</command>
+        <command>OCA\Appointments\Command\Metrics</command>
+    </commands>
+</info>

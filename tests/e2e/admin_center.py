@@ -168,8 +168,8 @@ def run_session(
         if admin:
             driver.navigate(base_url + "/settings/admin/essentialsplus")
             wait_for(
-                lambda: driver.execute("return document.querySelectorAll('[data-module-id]').length") == 8,
-                "Admin Center did not render all eight module manifests",
+                lambda: driver.execute("return document.querySelectorAll('[data-module-id]').length") == 9,
+                "Admin Center did not render all nine module manifests",
             )
             group_count = driver.execute("return document.querySelectorAll('[data-group-id]').length")
             if group_count != 8:

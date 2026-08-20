@@ -88,7 +88,7 @@ jobs:
         env:
           CHROMIUM_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}
           CHROMEDRIVER_BIN: ${{ steps.setup-chrome.outputs.chromedriver-path }}
-        run: sudo --preserve-env=CHROMIUM_BIN,CHROMEDRIVER_BIN,GITHUB_ACTIONS,GITHUB_WORKSPACE ./tests/deploy/run.sh --browser --recovery --hr --intranet --talk
+        run: sudo --preserve-env=CHROMIUM_BIN,CHROMEDRIVER_BIN,GITHUB_ACTIONS,GITHUB_WORKSPACE ./tests/deploy/run.sh --browser --recovery --hr --intranet --talk --appointments
 
   # Real DNS, Caddy, Internet ingress, NUC resources, TLS, offsite storage,
   # mail delivery, NAT media quality, and production use remain explicit external

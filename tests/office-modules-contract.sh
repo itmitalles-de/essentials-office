@@ -41,7 +41,7 @@ else
 fi
 
 jq -e '
-  .contractVersion == "2.0.0" and
+  .contractVersion == "2.1.0" and
   .product.displayName == "Essentials+ Office" and
   .product.brand == "Essentials Plus" and
   .states == ["not_installed", "needs_configuration", "disabled", "enabled", "degraded"] and
@@ -71,6 +71,9 @@ jq -e '
     select(.visibilityMode == "platform-global") | .id] == ["richdocuments"]) and
   ([.modules[] | select(.id == "talk") | .nextcloudApps[] |
     select(.visibilityMode == "platform-global") | .id] == ["spreed"]) and
+  ([.modules[] | select(.id == "appointments") | .nextcloudApps[] |
+    select(.source == "repository" and .visibilityMode == "platform-global") | .id] == ["appointments"]) and
+  ([.modules[] | select(.id == "appointments") | .defaultState] == ["disabled"]) and
   ([.modules[] | select(.id == "vaultwarden") | .composeServices] == [["vaultwarden"]]) and
   ([.modules[] | select(.id == "essentials-calls") | .externalServices[0].repository] == ["itmitalles-de/visual-pbx"])
 ' "$CONTRACT" >/dev/null || die 'module contract violates an Essentials+ Office invariant'

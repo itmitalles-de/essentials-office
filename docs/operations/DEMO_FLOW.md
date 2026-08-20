@@ -1,4 +1,4 @@
-# Workspace Suite demo flow
+# Essentials+ Office demo flow
 
 ## Data policy
 
@@ -37,6 +37,11 @@ classified as demo, and remove them with their data after acceptance.
    `demo.riley@workspace-demo.invalid`; Riley reads it in Nextcloud Mail.
 7. Restart Collabora and the Nextcloud app container separately. Reopen the
    document, confirm file versions, chat history, task/note, and local message.
+8. On an explicitly disposable instance, run the Appointments demo seed for
+   “Physiotherapie Beispiel”. Book one fictional slot, verify the internal
+   calendar and queued confirmation, cancel through the fragment-token link,
+   and confirm that the slot becomes available again. A parallel request for
+   the same slot must receive a conflict rather than a second booking.
 
 Record pass/fail, UTC timestamp, component versions, browser versions, source
 network class, and resource peaks. Do not record message bodies, access tokens,

@@ -1,20 +1,27 @@
-# Workspace Suite
+# Essentials+ Office
 
-Open-source collaboration platform and self-hosted alternative to Microsoft 365 / Google Workspace. The existing production-grade Nextcloud foundation is deployed at `https://cloud.itmitalles.de`; the repository grows around that foundation without replacing it.
+Open-source collaboration and office platform built on the existing Nextcloud
+foundation for `cloud.itmitalles.de`. The repository extends that foundation
+without replacing its deployment, identity, calendar, storage, or recovery
+boundaries.
 
 
 
-> **Main product 3 of 3.** The product name is **Workspace Suite**. The public Nextcloud hostname remains `cloud.itmitalles.de`; the repository should later be renamed administratively to `itmitalles-de/workspace-suite`.
+> The visible product name is **Essentials+ Office**. Historical repository and
+> host paths remain unchanged unless a separate operational migration is
+> approved.
 
 ## Product scope
 
-Workspace Suite is composed of independently operable modules:
+Essentials+ Office is composed of independently operable modules:
 
 - Nextcloud Files, sharing, versions and sync
 - Calendar, Contacts and Tasks as the canonical groupware data store
 - Nextcloud Talk; TURN and the high-performance backend are separate production stages
 - Nextcloud Office with a dedicated Collabora Online container for browser-based documents, spreadsheets and presentations
 - Nextcloud Mail connected to mailcow over IMAP/SMTP
+- Appointments (Termine) for tenant-scoped services, availability, public
+  booking, resources, reminders, customer-management tokens, and ICS export
 - Notes for personal notes, Collectives for shared knowledge, Deck for Kanban, plus Tables and Forms
 - mailcow as an independently managed mail subsystem; SOGo is an optional fallback webmail, not a second canonical calendar/contact system
 - centralized OIDC/SSO only after the core modules are stable
@@ -73,6 +80,7 @@ The base stack remains `compose.yaml`. Optional capabilities are independent:
 | Dedicated Collabora | `compose.collabora.yaml`, profile `office` | off |
 | coturn | `compose.talk-turn.yaml`, profile `talk-turn` | off |
 | mailcow | separate upstream checkout pinned by `mailcow/UPSTREAM_COMMIT` | not installed |
+| Appointments | native app in `nextcloud-apps/appointments` | optional; public pages off per organization |
 
 Operational runbooks:
 
@@ -83,6 +91,8 @@ Operational runbooks:
 - [Talk and TURN](docs/operations/TALK.md)
 - [mailcow boundary](mailcow/README.md)
 - [Fictitious end-to-end demo](docs/operations/DEMO_FLOW.md)
+- [Appointments architecture, operation, security, and user guide](docs/appointments.md)
+- [Appointments roadmap](docs/roadmap.md)
 
 ## Architecture
 
