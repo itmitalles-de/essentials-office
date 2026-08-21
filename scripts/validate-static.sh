@@ -66,7 +66,9 @@ PY
 mapfile -d '' javascript_files < <(find nextcloud-apps tests -type f -name '*.js' -print0 | sort -z)
 for javascript_file in "${javascript_files[@]}"; do node --check "$javascript_file"; done
 
-while IFS= read -r -d '' json_file; do jq empty "$json_file"; done < <(find . -path './.git' -prune -o -type f -name '*.json' -print0)
+while IFS= read -r -d '' json_file; do jq empty "$json_file"; done < <(
+  find . \( -path './.git' -o -path './node_modules' \) -prune -o -type f -name '*.json' -print0
+)
 python3 - <<'PY'
 import pathlib
 import xml.etree.ElementTree as ET

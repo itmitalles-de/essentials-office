@@ -105,6 +105,7 @@ PROXY_NETWORK=workspace-suite-test-proxy-"${suffix,,}"
 rsync -a \
   --exclude='.git/' \
   --exclude='.env' \
+  --exclude='node_modules/' \
   --exclude='reports/' \
   --exclude='inventory-*.md' \
   "$SOURCE_DIR/" "$WORK_DIR/"

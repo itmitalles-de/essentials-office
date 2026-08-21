@@ -26,3 +26,4 @@ secrets/*.pem
 .vscode/
 __pycache__/
 *.pyc
+/node_modules/

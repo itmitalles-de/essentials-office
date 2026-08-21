@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 script('appointments', 'common');
 script('appointments', 'public-booking');
+style('appointments', 'vendor/simple-business-tokens');
 style('appointments', 'appointments');
 
 /** @var \OCP\IL10N $l */

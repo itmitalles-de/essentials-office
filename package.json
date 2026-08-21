@@ -1,0 +1,14 @@
+{
+  "name": "essentials-office-design-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "design:sync": "simple-business-sync-nextcloud --target nextcloud-apps/appointments/css/vendor && simple-business-sync-nextcloud --target nextcloud-apps/essentialsplus/css/vendor",
+    "design:check": "simple-business-sync-nextcloud --check --target nextcloud-apps/appointments/css/vendor && simple-business-sync-nextcloud --check --target nextcloud-apps/essentialsplus/css/vendor",
+    "lint:design": "simple-business-lint --rules icons nextcloud-apps/appointments nextcloud-apps/essentialsplus"
+  },
+  "devDependencies": {
+    "@itmitalles-de/simple-business-design-system": "https://github.com/itmitalles-de/simple-business-design-system/releases/download/v0.1.1/itmitalles-de-simple-business-design-system-0.1.1.tgz"
+  }
+}

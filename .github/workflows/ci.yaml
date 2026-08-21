@@ -20,8 +20,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.2
+      - name: Set up Node.js for design-contract validation
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.0'
+          cache: npm
       - name: Install validation tools
-        run: sudo apt-get update && sudo apt-get install --yes jq nodejs python3-jsonschema ripgrep
+        run: sudo apt-get update && sudo apt-get install --yes jq python3-jsonschema ripgrep
+      - name: Install pinned design tools
+        run: npm ci --ignore-scripts
+      - name: Verify generated design assets and icon semantics
+        run: npm run design:check && npm run lint:design
       - name: Validate Compose, schemas, templates, and source
         run: ./scripts/validate-static.sh
       - name: Validate GitHub Actions workflow
