@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 script('essentialsplus', 'admin');
+style('essentialsplus', 'vendor/simple-business-tokens');
 style('essentialsplus', 'admin');
 ?>
 <div id="essentialsplus-admin"

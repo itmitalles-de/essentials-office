@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+style('essentialsplus', 'vendor/simple-business-tokens');
 style('essentialsplus', 'admin');
 /** @var list<array<string, mixed>> $modules */
 $modules = $_['modules'];

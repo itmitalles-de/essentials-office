@@ -10,6 +10,7 @@ WITH_RECOVERY=false
 WITH_HR=false
 WITH_INTRANET=false
 WITH_TALK=false
+WITH_APPOINTMENTS=false
 WORK_DIR=
 DATA_ROOT=
 PROJECT_NAME=
@@ -68,7 +69,8 @@ while [ "$#" -gt 0 ]; do
     --hr) WITH_HR=true; WITH_APPS=true ;;
     --intranet) WITH_INTRANET=true; WITH_APPS=true ;;
     --talk) WITH_TALK=true; WITH_APPS=true ;;
-    *) die 'usage: tests/deploy/run.sh [--apps] [--browser] [--recovery] [--hr] [--intranet] [--talk]' ;;
+    --appointments) WITH_APPOINTMENTS=true; WITH_BROWSER=true; WITH_APPS=true ;;
+    *) die 'usage: tests/deploy/run.sh [--apps] [--browser] [--recovery] [--hr] [--intranet] [--talk] [--appointments]' ;;
   esac
   shift
 done
@@ -103,6 +105,7 @@ PROXY_NETWORK=workspace-suite-test-proxy-"${suffix,,}"
 rsync -a \
   --exclude='.git/' \
   --exclude='.env' \
+  --exclude='node_modules/' \
   --exclude='reports/' \
   --exclude='inventory-*.md' \
   "$SOURCE_DIR/" "$WORK_DIR/"
@@ -148,7 +151,12 @@ occ() {
 }
 
 app_tree_hash() {
-  find "$DATA_ROOT/html/custom_apps/essentialsplus" -type f -print0 \
+  {
+    find "$DATA_ROOT/html/custom_apps/essentialsplus" -type f -print0
+    if [ -d "$DATA_ROOT/html/custom_apps/appointments" ]; then
+      find "$DATA_ROOT/html/custom_apps/appointments" -type f -print0
+    fi
+  } \
     | sort -z \
     | xargs -0 sha256sum \
     | sha256sum \
@@ -245,6 +253,14 @@ run_browser_e2e() {
   BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES" \
   CHROMIUM_BIN="$chromium_bin" \
     python3 "$WORK_DIR/tests/e2e/admin_center.py"
+  if [ "$WITH_APPOINTMENTS" = true ]; then
+    BROWSER_BASE_URL="$browser_base" \
+    BROWSER_CORE_ENV_FILE="$WORK_DIR/.env" \
+    BROWSER_USER_ENV_FILE="$browser_secret_file" \
+    BROWSER_PROJECT_DIR="$WORK_DIR" \
+    CHROMIUM_BIN="$chromium_bin" \
+      python3 "$WORK_DIR/tests/e2e/appointments.py"
+  fi
   kill "$CHROMEDRIVER_PID" >/dev/null 2>&1 || true
   wait "$CHROMEDRIVER_PID" 2>/dev/null || true
   CHROMEDRIVER_PID=
@@ -406,26 +422,26 @@ run_talk_e2e() {
   room=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
     --data 'roomType=2' --data-urlencode 'roomName=Essentials+ Office synthetic room' \
-    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room?format=json")
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room?format=json") || die 'Talk room creation request failed'
   token=$(jq -r '.ocs.data.token // empty' <<<"$room")
   [[ "$token" =~ ^[a-z0-9]{4,64}$ ]] || die 'Talk room API did not return a valid token'
   participant=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
     --data 'source=users' --data 'newParticipant=talk-bob-demo' \
-    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room/$token/participants?format=json")
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v4/room/$token/participants?format=json") || die 'Talk participant invitation request failed'
   jq -e '.ocs.meta.status == "ok"
     and (.ocs.meta.statuscode == 100 or .ocs.meta.statuscode == 200)' <<<"$participant" >/dev/null ||
     die 'Talk participant invitation failed'
   message=$(curl --fail --silent --show-error --netrc-file "$alice_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' --request POST \
     --data-urlencode 'message=Essentials+ Office synthetic Talk message' \
-    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json")
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json") || die 'Talk message request failed'
   jq -e '.ocs.meta.status == "ok"
     and .ocs.meta.statuscode == 201
     and (.ocs.data.id | tonumber) > 0' <<<"$message" >/dev/null || die 'Talk message send failed'
   messages=$(curl --fail --silent --show-error --netrc-file "$bob_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' \
-    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100")
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100") || die 'Talk participant message read request failed'
   jq -e '[.ocs.data[]? | select(.message == "Essentials+ Office synthetic Talk message")] | length == 1' <<<"$messages" >/dev/null ||
     die 'invited Talk participant did not receive the synthetic message'
   outsider_status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --netrc-file "$outsider_netrc" \
@@ -439,7 +455,7 @@ run_talk_e2e() {
   jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Talk reactivation failed'
   messages=$(curl --fail --silent --show-error --netrc-file "$bob_netrc" \
     -H 'OCS-APIRequest: true' -H 'Accept: application/json' \
-    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100")
+    "$TALK_TEST_BASE/ocs/v2.php/apps/spreed/api/v1/chat/$token?format=json&lookIntoFuture=0&limit=100") || die 'Talk post-reactivation message read request failed'
   jq -e '[.ocs.data[]? | select(.message == "Essentials+ Office synthetic Talk message")] | length == 1' <<<"$messages" >/dev/null ||
     die 'Talk room data was not preserved across logical disable'
   rm -f -- "$alice_netrc" "$bob_netrc" "$outsider_netrc"
@@ -536,6 +552,14 @@ run_module_control_tests() {
     jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Talk activation failed'
     BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,talk"
   fi
+  if [ "$WITH_APPOINTMENTS" = true ]; then
+    if ! state=$(occ essentialsplus:module:enable appointments); then
+      printf '%s\n' "$state" >&2
+      die 'Appointments enable command failed'
+    fi
+    jq -e '.state == "enabled" and .active == true' <<<"$state" >/dev/null || die 'Appointments activation failed'
+    BROWSER_EXPECTED_MODULES="$BROWSER_EXPECTED_MODULES,appointments"
+  fi
 
   if [ "$WITH_HR" = true ] && [ "$WITH_INTRANET" = true ]; then
     enabled_groups=$(occ config:app:get tables enabled) || die 'shared Tables visibility query failed'
@@ -606,7 +630,17 @@ fi
 if [ "$WITH_TALK" = true ]; then
   prepare_talk_e2e
 fi
+if [ "$WITH_APPOINTMENTS" = true ]; then
+  NEXTCLOUD_APP_CATALOG_FILE="$NEXTCLOUD_APP_CATALOG_FILE" "$WORK_DIR/scripts/reconcile-apps.sh" --module appointments
+  occ app:list --output=json | jq -e '.disabled | has("appointments")' >/dev/null ||
+    die 'Appointments package was published before explicit module activation'
+fi
 run_module_control_tests
+if [ "$WITH_APPOINTMENTS" = true ]; then
+  appointment_seed=$(occ appointments:demo:seed --confirm) || die 'Appointments demo seed failed'
+  jq -e '.slug == "physiotherapie-beispiel" and (.id | type == "string")' <<<"$appointment_seed" >/dev/null ||
+    die 'Appointments demo seed returned an invalid result'
+fi
 if [ "$WITH_TALK" = true ]; then
   run_talk_e2e
 fi

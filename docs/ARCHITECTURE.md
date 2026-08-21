@@ -12,6 +12,7 @@ user interface without deleting data.
 | --- | --- | --- | --- |
 | Files, shares, versions | Nextcloud Files | existing core on the NUC | implemented core |
 | Calendar, contacts, tasks | Nextcloud | Nextcloud apps / CalDAV / CardDAV | implemented core boundary |
+| Appointment booking | Appointments in Nextcloud | repository-owned native app, PostgreSQL, cron, system mail | implemented optional module; external CalDAV sync deferred |
 | Documents, spreadsheets, presentations | Nextcloud Office + Collabora | separate Collabora service | planned optional module |
 | Chat and meetings | Nextcloud Talk | app first; TURN/HPB separate stages | planned optional module |
 | Email transport and mailboxes | mailcow | separate upstream stack/host | planned optional module |
@@ -37,6 +38,12 @@ publishes their group-restricted link. Deactivation removes an entitlement or
 link only; it never removes data, volumes, databases, or backups. The repository
 does not contain a second portal service or automatic DNS/NUC change.
 
+Appointments is the exception that must be technically enabled instance-wide
+while active because it owns anonymous public routes. Its internal controllers
+still enforce organization-scoped Nextcloud-group permissions, and each public
+booking page has a separate default-off organization flag. Logical module
+deactivation disables the app without deleting its tables.
+
 ## Hard boundaries
 
 - Preserve `/opt/nextcloud`, `/srv/nextcloud`, shared Caddy, and `proxy_net`.
@@ -44,6 +51,9 @@ does not contain a second portal service or automatic DNS/NUC change.
   database nor secrets. mailcow remains a separate stack or host.
 - Nextcloud is canonical for calendar, contacts, and tasks. SOGo is optional
   fallback webmail, never a second canonical groupware store.
+- Appointments is authoritative for its booking records. The first milestone
+  exports ICS but does not claim external CalDAV update/delete or busy import;
+  that synchronization must stay behind a reviewed provider boundary.
 - Vaultwarden has a separate `/srv/vaultwarden` persistence/backup boundary;
   its profile publishes no host port and is private by default.
 - Intranet Lite is Collectives/Teams/Dashboard/Announcement Center only;
@@ -82,12 +92,14 @@ complete shared configuration is reconciled and validated.
    offsite backup, and disposable restore prerequisites are verified.
 2. Complete the Office Admin Center and synthetic HR/Intranet manual target
    states; test group visibility and least privilege.
-3. Run Vaultwarden's private-profile backup/restore and Caddy checks on an
+3. Install and migrate Appointments, validate its disposable tenant/race/DST
+   tests, then publish organization booking pages individually.
+4. Run Vaultwarden's private-profile backup/restore and Caddy checks on an
    approved disposable target before enabling any entitlement.
-4. Integrate Collabora, then Talk P2P, TURN, and HPB as separate stages.
-5. Deploy mailcow separately only on suitable infrastructure, then connect
+5. Integrate Collabora, then Talk P2P, TURN, and HPB as separate stages.
+6. Deploy mailcow separately only on suitable infrastructure, then connect
    Nextcloud Mail through IMAP/SMTP.
-6. Revisit Visual PBX only after its release gates; evaluate OIDC/SSO only when
+7. Revisit Visual PBX only after its release gates; evaluate OIDC/SSO only when
    each independently operated module is stable.
 
 ## Capacity decision

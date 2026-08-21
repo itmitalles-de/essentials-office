@@ -3,7 +3,33 @@
 This is the authoritative repository handoff. Do not create a competing root
 task list, infer live state from dated evidence, or touch production systems.
 
-## Now — documentation and remaining depth
+## Appointments milestone (2026-08-20)
+
+- [x] Add the separate native `appointments` app and optional-module contract.
+- [x] Add the relational tenant schema and validate its fresh migration.
+- [x] Implement services, staff profiles, locations, resources, availability,
+  public booking, internal appointment management, customer self-service,
+  notifications, ICS, retention, audit, observability, and fictional demo data.
+- [x] Prove the complete anonymous-to-internal browser journey, cancellation and
+  slot release, one-winner same-slot concurrency, and tenant isolation against
+  a clean disposable Nextcloud/PostgreSQL deployment.
+- [x] Pass the repository static, unit, contract, syntax, translation, and
+  security checks and document all unsupported integration claims.
+- [x] Re-audit customer exports, management-token scope, RBAC response fields,
+  cache headers, DST ambiguity, input bounds, notifications, and the complete
+  combined/isolated CI paths; fix and regression-test every confirmed issue.
+- [ ] Before production publication, manually verify the real system-mail
+  sender and client rendering, Caddy rate-limit/access-log behavior,
+  keyboard/screen-reader behavior, and encrypted offsite restore.
+- [ ] Activate CalDAV busy import/write synchronization or Nextcloud Talk only
+  as a separately reviewed roadmap milestone; the current providers must remain
+  disabled until their failure and retry semantics are proven.
+
+Appointments-specific deferred product scope is authoritative in
+`docs/roadmap.md`; do not add stubs or dependencies for those items merely to
+make them appear present.
+
+## Existing platform backlog (predates Appointments)
 
 - [x] Finish the disposable TLS Vaultwarden browser flow: synthetic account
   login, organization, collection, owner/member roles, and group; then rerun

@@ -2,141 +2,106 @@
 
 ## Product and immutable boundaries
 
-The visible product name is **Essentials+ Office**. The repository name,
-`cloud.itmitalles.de`, `/opt/nextcloud`, `/srv/nextcloud`, `proxy_net`, internal
-volume names, and the default branch remain unchanged.
+The visible product name is **Essentials+ Office**. Repository and deployment
+paths, the shared `proxy_net`, and the default branch remain unchanged.
 
-No real NUC, Caddy, DNS, router, firewall, Namecheap, backup, or user data was
-read or changed in this work. Every runtime check described below used isolated,
-randomly named disposable Docker resources. Older runtime statements in this
-repository are dated evidence only, not a current live verification.
+No real NUC, Caddy, DNS, router, firewall, offsite backup, mail account, or
+customer data was read or changed during the Appointments work. Runtime checks
+used isolated, randomly named disposable Docker resources and fictional data.
 
-## Branch and pull-request baseline
+## Git baseline
 
-- Current local branch: `agent/essentials-office-autonomous`.
-- The branch incorporates draft PR #1 (`agent/workspace-suite-iac`) and current
-  `origin/main`; PR #1 was not merged.
-- Baseline commits on this branch before the paused validation stage:
-  `bb3d79e`, `b888dcb`, and `b105280`.
-- Draft PR #1 had no review threads. Its static CI failure was independently
-  traced to ShellCheck SC2015; its history gitleaks job passed at that time.
-- The consolidated runtime code is pushed through `520c239`; this handoff-only
-  update follows it. Draft PR #2
-  (`Build Essentials+ Office modular control plane`) supersedes PR #1. PR #1
-  remains open and unchanged. At the time of this dated handoff update, PR #2
-  was mergeable and its exact-head CI was green; inspect GitHub for live merge
-  state instead of inferring it from this file.
+- Date of this handoff: 2026-08-20.
+- Current branch: `main`.
+- Baseline commit: `17081f2`, equal to `origin/main` when work started.
+- The Appointments milestone is intentionally uncommitted. All modified and
+  untracked files shown by `git status` belong to this milestone; nothing was
+  pushed.
 
-## Implemented on this branch
+## Appointments milestone
 
-- A versioned `office-modules.json` contract uses the exact states
-  `not_installed`, `needs_configuration`, `disabled`, `enabled`, and `degraded`
-  and the eight Essentials+ module groups.
-- The AGPL Nextcloud app `essentialsplus` provides an administrator-only catalog,
-  a permission-filtered user portal, an audited API, OCC list/status/enable/
-  disable/doctor/configure/metrics commands, and controlled app reconciliation.
-  It does not run arbitrary commands or control Docker, systemd, Caddy, DNS, or
-  firewall state. Deactivation does not delete module data or volumes.
-- Optional service boundaries remain separate: Collabora, Talk/TURN,
-  Vaultwarden, mail integration, and Essentials+ Calls do not share a database
-  or secrets with the Nextcloud core.
-- Vaultwarden is pinned to `1.37.1` by digest, closed to registration by default,
-  has no product host port, and keeps SQLite data, secrets, backup, and restore
-  paths separate from Nextcloud.
-- Synthetic HR Lite and Intranet Lite fixtures and idempotent OCC/WebDAV/OCS
-  reconciliation/verification paths are present. They use fictional identities
-  and supported application interfaces, not direct Nextcloud SQL changes.
-- Nextcloud-protected app types that reject group enablement are declared
-  `platform-global`. The Office portal and content permissions remain scoped;
-  logical deactivation disables an app when no other active module needs it and
-  never deletes its data. This applies to the relevant Intranet, HR, Talk, and
-  Collabora app declarations.
-- Talk TURN configuration no longer places the shared secret in process
-  arguments. Redis authentication no longer places its password on the command
-  line. Backup metadata now records repository/app/image evidence with secrets
-  redacted. Metrics contain health/age/version state but no user data or secrets.
-- Essentials+ Calls remains disabled by default and has only an external URL,
-  health/version contract. No PBX code, credentials, proxy route, or database
-  was added. Mail remains an integration contract, not an embedded mailcow stack.
+A separate native Nextcloud app now lives in `nextcloud-apps/appointments` and
+is registered as the optional Essentials+ module `appointments`. It reuses the
+existing Nextcloud users, authentication, groups, PostgreSQL, system mail, cron,
+and application conventions.
 
-## Verification evidence (2026-08-13, disposable only)
+Implemented scope:
 
-- The exact `520c239` tree passed `scripts/validate-static.sh` and
-  `git diff --check`. This covered all base/profile/overlay Compose renders,
-  Bash syntax, ShellCheck,
-  Python/JavaScript/PHP syntax, JSON/XML, Caddy validation, module invariants,
-  unsafe-pattern checks, and update-major policy.
-- GitHub Actions run `31730633740` for exact PR head `520c239` passed all four
-  jobs: `static-validation`, full-history `secret-scan`, `isolated-modules`, and
-  `disposable-office`. The combined job took 13m25s.
-- Isolated Collabora image/health/discovery/restart testing passed. This was not
-  a full WOPI document edit test.
-- Isolated TURN authenticated allocation and secret-rotation testing passed;
-  no host port was published.
-- Local TLS fake-service contracts for IMAP/SMTP and Essentials+ Calls passed.
-- The closed Vaultwarden product profile became healthy without a host port.
-  The strengthened TLS Web Vault flow passed with two synthetic accounts,
-  organization, collection, Owner/User roles, and an organization group. Its
-  consistent SQLite backup, checksum validation, encrypted temporary Restic
-  roundtrip, and restore into an empty target also passed. The product default
-  remains closed registration; only the isolated browser fixture opens it.
-- Targeted disposable HR Lite reconciliation and verification passed twice,
-  including the fictional workflow and least-privilege WebDAV checks. Targeted
-  Intranet Lite reconciliation passed twice, including fictional content,
-  editor/reader roles, the confidential-area boundary, and OCS search-provider
-  availability.
-- A targeted disposable Intranet run after the protected-app fix passed module
-  activation, health gates, group-union visibility for restrictable apps,
-  logical disable with WebDAV data preservation, reactivation, metrics, app
-  restart, and a second semantically idempotent deployment.
-- A targeted disposable Talk run after the protected-app and OCS-v2 fixes passed
-  room creation, participant invitation, message send/read, outsider rejection,
-  logical disable/reactivation with message preservation, app restart, and a
-  second semantically idempotent deployment. This is not evidence of real media
-  quality or NAT traversal.
-- The module-control run exposed an overly broad secret-name rejection for the
-  declared boolean Calls attestation `sipCredentialStorageReady`. The command
-  now relies on the manifest schema's declared typed keys as its allow-list;
-  undeclared secret-bearing input remains rejected by the automated test.
-- An earlier clean disposable Nextcloud core run on this branch passed install,
-  declarative app reconciliation, WebDAV byte roundtrip, app restart persistence,
-  and a second idempotent deployment. That run predates the latest combined
-  HR/Intranet/Talk/recovery hardening.
-- The exact-head combined run installed a clean Nextcloud core; reconciled HR
-  Lite, Intranet Lite, and Talk twice where applicable; proved module health
-  gates and content-preserving logical deactivation/reactivation; exercised a
-  Talk room/participant/message/outsider flow; and passed the automated Admin
-  Center plus ordinary-user portal browser flow. It then restarted the app,
-  applied a second semantically idempotent deployment, and preserved the
-  synthetic WebDAV file.
-- That run also created a consistent PostgreSQL/files backup with checksums and
-  version/revision metadata, round-tripped it through a temporary encrypted
-  Restic repository, and restored it into a completely empty random target.
-  Restored `occ status`, maintenance repair, database, Redis, cron, synthetic
-  WebDAV bytes, and share metadata passed. This local temporary Restic proof is
-  explicitly not evidence of a real offsite provider.
+- typed tenant-scoped catalog and booking schema with a forward migration;
+- services, existing-user staff profiles, locations, appointment types,
+  resources/capacity, assignments, custom form fields, and booking settings;
+- weekly availability, breaks, exceptions, leave, holiday/manual blocks,
+  buffers, notice/horizon rules, resource constraints, time zones, and DST;
+- public booking without an account and internal list/day/week/month calendar;
+- server-side tenant authorization and staff-own permission boundaries;
+- per-organization transactional locking and complete slot revalidation for
+  booking, rescheduling, cancellation, and relevant availability mutations;
+- opaque public identifiers and hashed, revocable customer-management tokens;
+- confirmation/reschedule/cancellation/reminder outbox, translated HTML/plain
+  mail, ICS, retry/backoff, retention anonymization, audit, and metrics;
+- responsive keyboard-usable German and English UI;
+- explicit fictional demo seed command and complete operations documentation.
 
-## Explicitly not completed
+Appointments remains authoritative. A disabled CalendarProvider and
+MeetingProvider define future CalDAV/Nextcloud Talk integration boundaries; no
+external calendar or meeting provider is claimed as active.
 
-- Collabora create/open/edit/reload through WOPI was not automated or verified;
-  only service/discovery/restart behavior was tested.
-- Real Talk browser media quality, NAT traversal, audio/video, and HPB were not
-  tested or claimed. HPB was not implemented.
-- Nextcloud Mail account configuration against the fake server and productive
-  mail delivery were not verified; only the external TLS health contract exists.
-- HR Lite and Intranet Lite app-specific objects that lack stable provisioning
-  APIs were not accepted manually. No manual UI acceptance is part of this task.
-- README/architecture/operations/Codex prompt/changelog branding consolidation,
-  `docs/NICE_TO_HAVE.md`, and `docs/VERIFICATION_MATRIX.md` are still unfinished.
-- HR/Intranet application-specific content was included in the successful full
-  Nextcloud backup/restore, but the restored target did not run dedicated
-  post-restore assertions for every HR/Intranet object.
-- Nothing was verified on the NUC, from the public Internet, or in production.
+## Verification evidence (2026-08-20, disposable only)
+
+- `scripts/validate-static.sh` passed after the implementation. It includes the
+  Appointments unit and contract suites, schema/manifest/security checks, PHP,
+  JavaScript, Python and shell syntax, ShellCheck, and translation parity.
+- A full PHP syntax pass in the Nextcloud 34 PHP image passed.
+- A clean disposable deployment with Nextcloud 34, PostgreSQL 17, Redis 7, and
+  cron passed installation, fresh migration, optional-module hidden state,
+  explicit activation, health gate, app restart, and semantic redeployment.
+- The browser run created a staff profile, assigned service and location,
+  configured working hours, and booked that exact service as an anonymous
+  customer. It then proved internal visibility and an encrypted outbox row.
+- Customer management removed the token fragment from the URL, cancelled via a
+  token-in-body request, kept rescheduling pinned to the existing staff/location
+  assignment, and proved that cancellation released the slot.
+- The follow-up security audit proved that customer data export includes public
+  form answers but excludes internal fields, non-admin catalogs omit user/calendar
+  bindings and operations, and internal JSON responses carry `no-store`.
+- Unit coverage rejects nonexistent and ambiguous DST wall times, empty required
+  multi-select answers, and invalid timestamp ranges. Customer notifications now
+  include the assigned staff and, when applicable, location.
+- Two concurrent public requests for the same slot produced one HTTP 201 and
+  one HTTP 409, never two active appointments.
+- A second tenant user could not read the first tenant's appointment.
+- The final combined disposable runner passed HR, Intranet, Talk, Appointments,
+  browser flows, restart/redeploy idempotence, encrypted temporary Restic, and a
+  full empty-target Nextcloud/PostgreSQL restore. The isolated Vaultwarden,
+  Collabora, TURN, mail, and Calls suites also passed.
+- Actionlint and a Gitleaks scan of the complete worktree passed. One earlier
+  combined run saw a non-reproduced Talk HTTP 404; a focused Talk+Appointments
+  run and the complete rerun both passed, and the Talk test now reports the
+  exact failing API stage if it recurs.
+
+## Explicitly not verified or implemented
+
+- No real SMTP delivery/client rendering, productive proxy rate limit, CalDAV
+  server, Nextcloud Talk room, or offsite restore was exercised.
+- CalDAV write/update/delete and external busy import remain disabled provider
+  work, not a silent partial synchronization.
+- Automatic German holiday feeds, configurable reminder offsets/daily digest,
+  logo/profile uploads, custom domains, payments, SMS, waiting lists, and
+  recurring/group appointments are roadmap items.
+- No production deployment or manual accessibility/screen-reader acceptance was
+  performed.
 
 ## Resume point
 
-Start with `.agent/TODO.md` and inspect live Git/PR state. The next coherent
-workstream is the unfinished Essentials+ Office documentation, verification
-matrix, and honest remaining module-depth work. Preserve every production
-boundary above; no NUC, DNS, Caddy, public ingress, real backup, or real user
-work was authorized or performed.
+Review the complete uncommitted diff and current test evidence before deciding
+whether to commit. The next Appointments work should be limited to real-service
+acceptance (SMTP, proxy/rate limits, accessibility, backup/restore) or a
+separately approved roadmap item. Do not infer production readiness from the
+disposable evidence above.
+
+## Simple Business design-system contract
+
+- `.simple-business-design-system.json` pins the central UI source to commit
+  `e508cc2` and package version `0.1.0`; no rules are copied into this product.
+- Existing owned app UI remains legacy. Deterministic generated CSS/SVG and its
+  CI check wait for the central package; Nextcloud production stays Node-free.

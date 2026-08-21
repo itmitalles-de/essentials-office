@@ -1,6 +1,6 @@
 # Office architecture handoff
 
-This is a concise navigation map of the implemented default-branch architecture.
+This is a concise navigation map of the implemented repository architecture.
 Use `README.md` for operational detail and `docs/ARCHITECTURE.md` for the
 authoritative product capability map, boundaries, and staged rollout.
 
@@ -108,6 +108,48 @@ encrypted independently stored backup remain production prerequisites.
 
 Module-specific validation belongs with the module and cannot be inferred from
 the core health check.
+
+## Appointments module
+
+The current uncommitted worktree adds `nextcloud-apps/appointments` as a native,
+optional Nextcloud app. It is separate from the `essentialsplus` control plane
+but registered in `office-modules.json` so activation and health gating follow
+the existing module lifecycle.
+
+```text
+public booking/manage        authenticated internal UI
+          |                              |
+ public controllers             internal controllers
+          +---------- authorization/validation --------+
+                                      |
+                         availability/booking services
+                                      |
+                    organization row lock + transaction
+                       /             |              \
+                 relational data  mail outbox   audit/history
+                                      |
+                                Nextcloud cron
+```
+
+Every Appointments domain row carries `organization_id`. Internal requests map
+the current Nextcloud user through organization groups and optional staff UID;
+public requests resolve only opaque slugs/public IDs or a hash-verified token.
+PII search uses POST bodies. No separate user directory, database, scheduler,
+SMTP server, or secret store is introduced.
+
+Instants are UTC Unix timestamps. Availability configuration uses IANA zones,
+defaulting to `Europe/Berlin`, and is evaluated server-side with PHP time-zone
+rules. Booking writes serialize on the organization row and recalculate staff,
+location, buffer, exception, appointment, and resource capacity constraints in
+the same transaction.
+
+Appointments is authoritative in this milestone. ICS is generated directly;
+CalendarProvider and MeetingProvider are disabled extension boundaries. The
+system mailer is used through an encrypted, idempotency-keyed outbox. Aggregate
+metrics contain no tenant slug, customer, token, booking number, or free text.
+
+The definitive domain, API, security, operations, migration, mail, calendar,
+backup, and known-limit documentation is `docs/appointments.md`.
 
 ## Important constraints
 

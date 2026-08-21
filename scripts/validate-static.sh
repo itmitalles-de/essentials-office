@@ -66,15 +66,19 @@ PY
 mapfile -d '' javascript_files < <(find nextcloud-apps tests -type f -name '*.js' -print0 | sort -z)
 for javascript_file in "${javascript_files[@]}"; do node --check "$javascript_file"; done
 
-while IFS= read -r -d '' json_file; do jq empty "$json_file"; done < <(find . -path './.git' -prune -o -type f -name '*.json' -print0)
+while IFS= read -r -d '' json_file; do jq empty "$json_file"; done < <(
+  find . \( -path './.git' -o -path './node_modules' \) -prune -o -type f -name '*.json' -print0
+)
 python3 - <<'PY'
 import pathlib
 import xml.etree.ElementTree as ET
 for source in pathlib.Path("nextcloud-apps").rglob("*.xml"):
     ET.parse(source)
 PY
-docker run --rm --network none -v "$PROJECT_DIR/nextcloud-apps/essentialsplus:/app:ro" nextcloud:34-apache \
-  sh -ec 'find /app -type f -name "*.php" -print0 | xargs -0 -n1 php -l >/dev/null'
+docker run --rm --network none -v "$PROJECT_DIR/nextcloud-apps:/apps:ro" nextcloud:34-apache \
+  sh -ec 'find /apps -type f -name "*.php" -print0 | xargs -0 -n1 php -l >/dev/null'
+"$PROJECT_DIR/tests/appointments-unit.sh"
+"$PROJECT_DIR/tests/appointments-contract.sh"
 
 for caddy_file in Caddyfile.example Caddyfile.vaultwarden.example caddy/office.Caddyfile.example tests/vaultwarden/Caddyfile; do
   docker run --rm --network none --read-only --tmpfs /tmp:size=16m --tmpfs /data:size=16m --tmpfs /config:size=4m \

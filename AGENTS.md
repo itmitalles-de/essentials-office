@@ -58,6 +58,23 @@ operational documents and scripts only for the component being changed.
   supported, only for large independent areas such as mail or Talk.
 - Record durable findings in `.agent/` rather than leaving them only in chat.
 
+## Simple Business UI contract
+
+For every repository-owned Nextcloud app UI change, first read the canonical,
+version-pinned Simple Business contract named in
+`.simple-business-design-system.json`. In the standard sibling checkout, the
+authoritative files are under `../simple-business-design-system/docs/design-system/`.
+Do not duplicate or reinterpret those rules in this repository. The upstream
+Nextcloud shell remains a host-platform exception; owned app surfaces comply
+where the supported Nextcloud contract permits.
+
+The central contract governs the shared shell, color/tokens, flat construction,
+sidebar/drawer behavior, settings anatomy, theme control, icon semantics, and
+five-direction comparison. Existing UI is legacy until migrated; do not add new
+violations. Generated CSS/SVG must come from an exact released version and stay
+app-local; production remains Node-free. Never use a floating branch, CDN, or
+runtime download.
+
 ## Validation
 
 Use checks proportional to the change:

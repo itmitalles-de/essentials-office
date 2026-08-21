@@ -18,6 +18,14 @@
 | Forms | `forms` |
 | Nextcloud Office | `richdocuments` |
 
+Repository-owned native apps are versioned with this repository instead of the
+App Store:
+
+| Capability | App ID | Source |
+| --- | --- | --- |
+| Essentials+ module control plane | `essentialsplus` | `nextcloud-apps/essentialsplus` |
+| Appointment booking | `appointments` | `nextcloud-apps/appointments` |
+
 `scripts/reconcile-apps.sh` first verifies that the running installation is
 healthy, outside maintenance, does not need a database upgrade, and remains on
 Nextcloud major 34. It then downloads the App Store catalog filtered for the
@@ -29,6 +37,12 @@ disabled apps are enabled, and enabled apps are left unchanged. A consistent
 backup is taken before the first mutation. Any failed command aborts the run.
 An explicit `--update` updates only declared apps through OCC's compatible
 release resolver; it does not change the Nextcloud image or major version.
+
+Optional repository apps are copied through a same-filesystem staging
+directory with ownership checks. Installing `appointments` leaves it disabled;
+the Essentials+ module activation performs the health-gated global enable that
+its anonymous routes require. Deactivation disables code execution but keeps
+all appointment tables for retention/export and later reactivation.
 
 ## Operation
 
@@ -45,6 +59,16 @@ Install/enable missing apps:
 cd /opt/nextcloud
 ./scripts/reconcile-apps.sh
 ```
+
+Install the Appointments package without publishing it:
+
+```bash
+cd /opt/nextcloud
+sudo ./scripts/reconcile-apps.sh --module appointments
+```
+
+Activation and organization setup are documented in
+[Appointments](../appointments.md).
 
 Deliberately update declared apps after reviewing their release notes:
 

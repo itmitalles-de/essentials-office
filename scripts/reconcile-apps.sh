@@ -22,6 +22,10 @@ occ() {
   docker compose exec -T -u www-data app php occ "$@"
 }
 
+installed_app_version() {
+  occ config:app:get "$1" installed_version --default-value=''
+}
+
 cleanup() {
   local status=$?
   if [ -n "$WORK_DIR" ] && [[ "$WORK_DIR" == /tmp/essentialsplus-apps.* ]] && [ -d "$WORK_DIR" ]; then
@@ -152,8 +156,11 @@ for app_json in "${apps[@]}"; do
       printf '  %-20s shipped package\n' "$app"
       ;;
     repository)
-      [ "$app" = essentialsplus ] || die "unsupported repository-owned app: $app"
-      source_version=$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' nextcloud-apps/essentialsplus/appinfo/info.xml | head -n 1)
+      case "$app" in
+        appointments|essentialsplus) ;;
+        *) die "unsupported repository-owned app: $app" ;;
+      esac
+      source_version=$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' "nextcloud-apps/$app/appinfo/info.xml" | head -n 1)
       [ -n "$source_version" ] || die 'could not read repository app version'
       printf '  %-20s repository %s\n' "$app" "$source_version"
       ;;
@@ -167,17 +174,28 @@ for app_json in "${apps[@]}"; do
   app=$(jq -r '.id' <<<"$app_json")
   source=$(jq -r '.source' <<<"$app_json")
   activate=$(jq -r '.activateOnReconcile' <<<"$app_json")
-  installed_version=$(jq -r --arg app "$app" '.enabled[$app] // .disabled[$app] // empty' <<<"$app_state")
+  installed_version=$(installed_app_version "$app")
   if [ -z "$installed_version" ]; then
     changes_required=true
   elif [ "$activate" = true ] && ! jq -e --arg app "$app" '.enabled | has($app)' <<<"$app_state" >/dev/null; then
     changes_required=true
   fi
   if [ "$source" = repository ]; then
-    target=$(awk -F= '$1 == "NEXTCLOUD_DATA_ROOT" {print $2; exit}' .env)/html/custom_apps/essentialsplus
-    if [ ! -d "$target" ] || ! diff -qr --no-dereference --exclude=office-modules.json \
-      nextcloud-apps/essentialsplus "$target" >/dev/null 2>&1 || [ ! -f "$target/resources/office-modules.json" ] ||
-      ! cmp --silent office-modules.json "$target/resources/office-modules.json"; then
+    target=$(awk -F= '$1 == "NEXTCLOUD_DATA_ROOT" {print $2; exit}' .env)/html/custom_apps/"$app"
+    repository_tree_matches=false
+    if [ -d "$target" ]; then
+      if [ "$app" = essentialsplus ]; then
+        diff -qr --no-dereference --exclude=office-modules.json \
+          "nextcloud-apps/$app" "$target" >/dev/null 2>&1 && repository_tree_matches=true
+      else
+        diff -qr --no-dereference "nextcloud-apps/$app" "$target" >/dev/null 2>&1 && repository_tree_matches=true
+      fi
+    fi
+    if [ "$repository_tree_matches" = false ]; then
+      changes_required=true
+    fi
+    if [ "$app" = essentialsplus ] && { [ ! -f "$target/resources/office-modules.json" ] ||
+      ! cmp --silent office-modules.json "$target/resources/office-modules.json"; }; then
       changes_required=true
     fi
   fi
@@ -195,15 +213,28 @@ else
     source=$(jq -r '.source' <<<"$app_json")
     activate=$(jq -r '.activateOnReconcile' <<<"$app_json")
     app_state=$(occ app:list --output=json)
-    installed_version=$(jq -r --arg app "$app" '.enabled[$app] // .disabled[$app] // empty' <<<"$app_state")
+    installed_version=$(installed_app_version "$app")
     if [ "$source" = repository ]; then
-      ESSENTIALSPLUS_BACKUP_DONE=true "$SCRIPT_DIR/install-essentialsplus-app.sh"
+      case "$app" in
+        essentialsplus)
+          ESSENTIALSPLUS_BACKUP_DONE=true "$SCRIPT_DIR/install-essentialsplus-app.sh"
+          ;;
+        appointments)
+          APPOINTMENTS_BACKUP_DONE=true "$SCRIPT_DIR/install-appointments-app.sh"
+          ;;
+        *) die "unsupported repository-owned app: $app" ;;
+      esac
       app_state=$(occ app:list --output=json)
-      installed_version=$(jq -r --arg app "$app" '.enabled[$app] // .disabled[$app] // empty' <<<"$app_state")
     fi
     if [ -z "$installed_version" ]; then
       if [ "$source" = repository ]; then
         occ app:enable "$app" >/dev/null
+        # Enabling is required once so Nextcloud registers the local package and
+        # runs its migration. Optional modules must nevertheless stay private
+        # until their health-gated module activation is requested explicitly.
+        if [ "$activate" != true ]; then
+          occ app:disable "$app" >/dev/null
+        fi
       elif [ "$activate" = true ]; then
         occ app:install "$app" >/dev/null
       else
@@ -223,7 +254,7 @@ report_lines="$WORK_DIR/report.jsonl"
 for app_json in "${apps[@]}"; do
   app=$(jq -r '.id' <<<"$app_json")
   source=$(jq -r '.source' <<<"$app_json")
-  installed_version=$(jq -r --arg app "$app" '.enabled[$app] // .disabled[$app] // empty' <<<"$final_state")
+  installed_version=$(installed_app_version "$app")
   enabled=$(jq -r --arg app "$app" '.enabled | has($app)' <<<"$final_state")
   [ -n "$installed_version" ] || die "$app is missing after reconciliation"
   compatible_version=$installed_version

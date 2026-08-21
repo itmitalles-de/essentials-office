@@ -156,7 +156,10 @@ deletion policy requires a separate, explicit decision.
    PostgreSQL user.
 6. Start Redis and Nextcloud, inspect OCC status, then disable maintenance mode.
 7. Start cron, restore cron mode, and run the local and public health checks.
-8. Enable Caddy/public routing only after data, shares, DAV, and security
+8. If Appointments is installed, verify its version, tenant-scoped aggregate
+   counts, pending/failed job counts, and a fictional booking/ICS/cancellation
+   journey without printing customer rows or resuming public pages prematurely.
+9. Enable Caddy/public routing only after data, shares, DAV, and security
    warnings have been reviewed.
 
 Rollback is replacement of the disposable/replacement host from the previous
